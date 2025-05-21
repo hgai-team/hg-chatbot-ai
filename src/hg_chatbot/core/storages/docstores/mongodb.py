@@ -1,0 +1,206 @@
+import json
+from typing import List, Optional, Union
+
+from core.base import Document
+from .base import BaseDocumentStore
+
+class MongoDBDocumentStore(BaseDocumentStore):
+    """MongoDB document store which supports full-text search queries"""
+
+    def __init__(
+        self,
+        connection_string: str,
+        database_name: str,
+        collection_name: str,
+        **kwargs,
+    ):
+        try:
+            from pymongo import MongoClient
+            from pymongo.collection import Collection
+            from pymongo.database import Database
+        except ImportError:
+            raise ImportError(
+                "Please install pymongo: 'pip install pymongo'"
+            )
+
+        self.connection_string = connection_string
+        self.database_name = database_name
+        self.collection_name = collection_name
+
+        self.client: MongoClient = MongoClient(connection_string)
+        self.db: Database = self.client[database_name]
+        self.collection: Collection = self.db[collection_name]
+
+        _ = self.create_index()
+
+    def drop_index(self):
+        index_names = [idx["name"] for idx in self.collection.list_indexes()]
+        for idx in index_names:
+            self.collection.drop_index(idx)
+
+    def create_index(self):
+        import pymongo
+        index_names = [idx["name"] for idx in self.collection.list_indexes()]
+
+        if "text_index" not in index_names:
+            self.collection.create_index([("text", pymongo.TEXT)], name="text_index")
+
+        if "doc_id_index" not in index_names:
+            self.collection.create_index([("id", pymongo.ASCENDING)], name="doc_id_index", unique=True)
+
+        if "attributes_filename_idx" not in index_names:
+            self.collection.create_index([("attributes.file_name", pymongo.ASCENDING)], name="attributes_filename_idx")
+
+    async def add(
+        self,
+        docs: Union[Document, List[Document]],
+        **kwargs,
+    ):
+        """Load documents into MongoDB storage."""
+        from pymongo import ReplaceOne
+
+        if not isinstance(docs, list):
+            docs = [docs]
+
+        doc_ids = [doc.doc_id for doc in docs]
+
+        documents_to_insert = [
+            ReplaceOne(
+                {"id": doc_id},
+                {
+                    "id": doc_id,
+                    "text": doc.text,
+                    "attributes": doc.metadata,
+                },
+                upsert=True,
+            )
+            for doc_id, doc in zip(doc_ids, docs)
+        ]
+
+        if documents_to_insert:
+            self.collection.bulk_write(documents_to_insert, ordered=False)
+
+    async def query(
+        self, query: str, top_k: int = 20, doc_ids: Optional[list] = None, with_scores: bool = True
+    ): #-> List[Document]:
+        """Search document store using text search query"""
+        try:
+            find_filter = {"$text": {"$search": query}}
+            if doc_ids:
+                find_filter = {
+                    "$and": [
+                        {"id": {"$in": doc_ids}},
+                        find_filter
+                    ]
+                }
+
+            projection = {"score": {"$meta": "textScore"}}
+
+            cursor = self.collection.find(
+                find_filter,
+                projection
+            ).sort([("score", {"$meta": "textScore"})]).limit(top_k)
+
+            docs = list(cursor)
+        except Exception as e:
+            print(f"Error querying MongoDB: {e}")
+            docs = []
+
+        if with_scores:
+            results, scores = [], []
+            for doc in docs:
+                results.append({
+                    "id": doc["id"],
+                    "text": doc["text"],
+                    "attributes": doc["attributes"]
+                })
+                scores.append(doc["score"])
+            return results, scores
+
+        return [
+            Document(
+                id_=doc["id"],
+                text=doc["text"] if doc["text"] else "<empty>",
+                metadata=doc["attributes"],
+            )
+            for doc in docs
+        ]
+
+    def get(self, ids: Union[List[str], str]) -> List[Document]:
+        """Get document by id"""
+        if not isinstance(ids, list):
+            ids = [ids]
+
+        if len(ids) == 0:
+            return []
+
+        try:
+            docs = list(self.collection.find({"id": {"$in": ids}}))
+        except Exception as e:
+            print(f"Error retrieving documents from MongoDB: {e}")
+            docs = []
+
+        return [
+            Document(
+                id_=doc["id"],
+                text=doc["text"] if doc["text"] else "<empty>",
+                metadata=doc["attributes"],
+            )
+            for doc in docs
+        ]
+
+    def get_all(self) -> List[Document]:
+        """Get all documents"""
+        try:
+            docs = list(self.collection.find({}))
+        except Exception as e:
+            print(f"Error retrieving all documents from MongoDB: {e}")
+            docs = []
+
+        return [
+            Document(
+                id_=doc["id"],
+                text=doc["text"] if doc["text"] else "<empty>",
+                metadata=doc["attributes"],
+            )
+            for doc in docs
+        ]
+
+    def count(self) -> int:
+        """Count number of documents"""
+        try:
+            return self.collection.count_documents({})
+        except Exception as e:
+            print(f"Error counting documents in MongoDB: {e}")
+            return 0
+
+    async def delete(self, ids: Union[List[str], str]):
+        """Delete document by id"""
+        if not isinstance(ids, list):
+            ids = [ids]
+
+        if len(ids) == 0:
+            return
+
+        try:
+            self.collection.delete_many({"id": {"$in": ids}})
+        except Exception as e:
+            print(f"Error deleting documents from MongoDB: {e}")
+
+    def drop(self):
+        """Drop the document store collection"""
+        try:
+            self.collection.drop()
+            self.collection = self.db[self.collection_name]
+            self.drop_index()
+            self.create_index()
+        except Exception as e:
+            print(f"Error dropping MongoDB collection: {e}")
+
+    def __persist_flow__(self):
+        """Return configuration for persistence"""
+        return {
+            "connection_string": self.connection_string,
+            "database_name": self.database_name,
+            "collection_name": self.collection_name,
+        }

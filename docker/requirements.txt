@@ -1,0 +1,25 @@
+# python=3.10
+
+llama-index
+llama-index-agent-openai
+llama-index-llms-openai
+llama-index-llms-google-genai
+llama-index-callbacks-langfuse
+llama-index-vector-stores-qdrant
+llama-index-llms-langchain
+
+langfuse
+qdrant_client
+lancedb
+tantivy
+pymongo
+discord
+openpyxl
+pymupdf
+aiofiles
+python-docx
+
+fastapi
+uvicorn
+python-multipart
+pydantic_settings

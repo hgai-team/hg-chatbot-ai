@@ -1,0 +1,10 @@
+template: |
+  {role}: {description}
+
+  ### Hướng dẫn:
+  {instructions}
+
+  ### Đầu vào:
+  {input}
+
+  ### Phản hồi:
