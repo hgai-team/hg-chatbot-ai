@@ -33,12 +33,12 @@ def get_query_processing_service(
 
     if database_name is None:
         database_name = settings.MONGODB_BASE_DATABASE_NAME
-    else:
+    elif not database_name.endswith(settings.MONGODB_BASE_DATABASE_NAME):
         database_name = f"{database_name}{settings.MONGODB_BASE_DATABASE_NAME}"
 
     if collection_name is None:
         collection_name = settings.MONGODB_BASE_CHAT_HISTORY_COLLECTION_NAME
-    else:
+    elif not collection_name.endswith(settings.MONGODB_BASE_CHAT_HISTORY_COLLECTION_NAME):
         collection_name = f"{collection_name}{settings.MONGODB_BASE_CHAT_HISTORY_COLLECTION_NAME}"
 
     google_llm = get_google_genai_llm(
@@ -101,12 +101,9 @@ def get_chat_service(
     if agent_prompt_path is None:
         agent_prompt_path = settings.VAHACHA_AGENT_PROMPT_PATH
 
-    if bot_name is None:
-        database_name = settings.MONGODB_BASE_DATABASE_NAME
-        collection_name = settings.MONGODB_BASE_CHAT_HISTORY_COLLECTION_NAME
-    else:
-        database_name = f"{bot_name}{settings.MONGODB_BASE_DATABASE_NAME}"
-        collection_name = f"{bot_name}{settings.MONGODB_BASE_CHAT_HISTORY_COLLECTION_NAME}"
+
+    database_name = f"{bot_name}{settings.MONGODB_BASE_DATABASE_NAME}"
+    collection_name = f"{bot_name}{settings.MONGODB_BASE_CHAT_HISTORY_COLLECTION_NAME}"
 
 
     main_llm = get_openai_llm()

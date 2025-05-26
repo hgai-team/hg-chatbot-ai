@@ -51,7 +51,7 @@ def get_qdrant_vector_store(
 
     if collection_name is None:
         collection_name = settings.QDRANT_BASE_COLLECTION_NAME
-    else:
+    elif not collection_name.endswith(settings.QDRANT_BASE_COLLECTION_NAME):
         collection_name = f"{collection_name}{settings.QDRANT_BASE_COLLECTION_NAME}"
 
     qdrant_client = QdrantClient(host=host, port=port)
@@ -70,12 +70,12 @@ def get_mongodb_memory_store(
 
     if database_name is None:
         database_name = settings.MONGODB_BASE_DATABASE_NAME
-    else:
+    elif not database_name.endswith(settings.MONGODB_BASE_DATABASE_NAME):
         database_name = f"{database_name}{settings.MONGODB_BASE_DATABASE_NAME}"
 
     if collection_name is None:
         collection_name = settings.MONGODB_BASE_CHAT_HISTORY_COLLECTION_NAME
-    else:
+    elif not collection_name.endswith(settings.MONGODB_BASE_CHAT_HISTORY_COLLECTION_NAME):
         collection_name = f"{collection_name}{settings.MONGODB_BASE_CHAT_HISTORY_COLLECTION_NAME}"
 
     return MongoDBMemoryStore(
@@ -96,12 +96,12 @@ def get_mongodb_doc_store(
 
     if database_name is None:
         database_name = settings.MONGODB_BASE_DATABASE_NAME
-    else:
+    elif not database_name.endswith(settings.MONGODB_BASE_DATABASE_NAME):
         database_name = f"{database_name}{settings.MONGODB_BASE_DATABASE_NAME}"
 
     if collection_name is None:
         collection_name = settings.MONGODB_BASE_DOC_COLLECTION_NAME
-    else:
+    elif not collection_name.endswith(settings.MONGODB_BASE_DOC_COLLECTION_NAME):
         collection_name = f"{collection_name}{settings.MONGODB_BASE_DOC_COLLECTION_NAME}"
 
     return MongoDBDocumentStore(

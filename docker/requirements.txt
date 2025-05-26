@@ -23,3 +23,5 @@ fastapi
 uvicorn
 python-multipart
 pydantic_settings
+sqlmodel
+alembic

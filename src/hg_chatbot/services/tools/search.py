@@ -4,6 +4,8 @@ from typing import List, Dict, Any, Tuple
 
 from fastapi import HTTPException
 
+from qdrant_client.models import Filter, FieldCondition, MatchValue, MatchAny
+
 from core.embeddings import OpenAIEmbedding
 
 from core.storages import (
@@ -137,6 +139,98 @@ class SearchTool:
                     seen_ids.add(doc_id)
 
         return final_results[:top_k]
+
+    def user_find_similar_documents(
+        self,
+        user_context: dict,
+        embedding: List[float] = None,
+        query_text: str = None,
+        top_k: int = 20,
+    ):
+        if query_text:
+            embedding=self.get_embed(query_text=query_text, user_id="demo", session_id="demo")
+
+        should_conditions = [
+            FieldCondition(key="general", match=MatchValue(value=True))
+        ]
+
+        projs = user_context.get("projects", [])
+        if projs:
+            should_conditions.append(
+                FieldCondition(key="projects", match=MatchAny(any=projs))
+            )
+        nets = user_context.get("networks", [])
+        if nets:
+            should_conditions.append(
+                FieldCondition(key="networks", match=MatchAny(any=nets))
+            )
+        deps = user_context.get("departments", [])
+        if deps:
+            should_conditions.append(
+                FieldCondition(key="departments", match=MatchAny(any=deps))
+            )
+
+        try:
+            results = self.qdrant_vector_store.query(
+                embedding=embedding,
+                top_k=top_k,
+                qdrant_filters=Filter(
+                    should=should_conditions
+                )
+            )
+        except Exception as e:
+            print(e)
+
+        return results
+
+    async def user_find_documents_by_keywords(
+        self,
+        keywords: List[str],
+        user_context,
+        top_k: int = 20,
+    ):
+        import asyncio
+        import concurrent.futures
+
+        keywords = [keyword.lower() for keyword in keywords]
+        query_string = " ".join(keywords)
+
+        docs_mongo = await self.mongodb_doc_store.user_query(
+            query=query_string,
+            top_k=top_k,
+            user_context=user_context
+        )
+
+        try:
+            all_docs: List[Document] = docs_mongo
+            if all_docs:
+                loop = asyncio.get_running_loop()
+                with concurrent.futures.ThreadPoolExecutor(min(16, os.cpu_count() + 4)) as executor:
+                    tasks = [
+                        loop.run_in_executor(
+                            executor,
+                            self._calculate_score,
+                            doc,
+                            keywords
+                        )
+
+                        for doc in all_docs
+                    ]
+
+                    scored_results_manual = await asyncio.gather(*tasks, return_exceptions=True)
+
+                scored_docs_manual = []
+                for result in scored_results_manual:
+                    if isinstance(result, Exception):
+                        print(f"Error during manual scoring task: {result}")
+                    elif result is not None:
+                        scored_docs_manual.append(result)
+
+                scored_docs_manual.sort(key=lambda x: x['score'], reverse=True)
+        except Exception as e:
+            print(f"Error during manual scoring process: {e}")
+
+        return scored_docs_manual[:top_k]
 
     # async def find_documents_by_bm25(self, query: str, top_k: int = 20, with_score: bool = False):
     #     scores = await self.bm25_retriever.get_top_k(query=query, k=top_k)

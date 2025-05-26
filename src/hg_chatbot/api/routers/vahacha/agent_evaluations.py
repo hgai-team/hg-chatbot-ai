@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from typing import Annotated
 
 from api.security import get_api_key
@@ -23,14 +23,18 @@ APIKeyDep = Annotated[str, Depends(get_api_key)]
 async def safety_guard(
     request: ChatRequest,
     api_key: APIKeyDep,
+    agent_prompt_path: str = None,
 ):
     from services.agentic_workflow.vahacha import (
         get_evaluation_agent,
         get_google_genai_llm
     )
 
+    if agent_prompt_path is None:
+        agent_prompt_path = get_settings_cached().VAHACHA_AGENT_PROMPT_PATH
+
     evaluation_agent = get_evaluation_agent(
-        agent_prompt_path=request.agent_prompt_path
+        agent_prompt_path=agent_prompt_path
     )
 
     google_llm = get_google_genai_llm(
@@ -59,14 +63,18 @@ async def safety_guard(
 async def query_classifier(
     request: ChatRequest,
     api_key: APIKeyDep,
+    agent_prompt_path: str = None,
 ):
     from services.agentic_workflow.vahacha import (
         get_evaluation_agent,
         get_google_genai_llm
     )
 
+    if agent_prompt_path is None:
+        agent_prompt_path = get_settings_cached().VAHACHA_AGENT_PROMPT_PATH
+
     evaluation_agent = get_evaluation_agent(
-        agent_prompt_path=request.agent_prompt_path
+        agent_prompt_path=agent_prompt_path
     )
 
     google_llm = get_google_genai_llm(
@@ -97,12 +105,15 @@ async def query_preprocessor(
     query: str,
     user_id: str,
     session_id: str,
-    agent_prompt_path: str
+    agent_prompt_path: str = None
 ):
     from services.agentic_workflow.vahacha import (
         get_evaluation_agent,
         get_google_genai_llm
     )
+
+    if agent_prompt_path is None:
+        agent_prompt_path = get_settings_cached().VAHACHA_AGENT_PROMPT_PATH
 
     evaluation_agent = get_evaluation_agent(
         agent_prompt_path=agent_prompt_path
@@ -137,12 +148,15 @@ async def keyword_extractor(
     queries: list[str],
     user_id: str,
     session_id: str,
-    agent_prompt_path: str
+    agent_prompt_path: str = None,
 ):
     from services.agentic_workflow.vahacha import (
         get_evaluation_agent,
         get_google_genai_llm
     )
+
+    if agent_prompt_path is None:
+        agent_prompt_path = get_settings_cached().VAHACHA_AGENT_PROMPT_PATH
 
     evaluation_agent = get_evaluation_agent(
         agent_prompt_path=agent_prompt_path
@@ -174,23 +188,25 @@ async def keyword_extractor(
 async def response_permission_editor(
     request: ChatRequest,
     api_key: APIKeyDep,
+    response_text: str = Body(...)
 ):
     from services.agentic_workflow.vahacha import (
         get_evaluation_agent,
         get_google_genai_llm
     )
+    agent_prompt_path = get_settings_cached().VAHACHA_AGENT_PROMPT_PATH
 
     evaluation_agent = get_evaluation_agent(
-        agent_prompt_path=request.agent_prompt_path
+        agent_prompt_path=agent_prompt_path
     )
 
     google_llm = get_google_genai_llm(
-        model_name=get_settings_cached().GOOGLEAI_MODEL
+        model_name=get_settings_cached().GOOGLEAI_MODEL_EDITOR
     )
 
     try:
         response_permission_editor_response = await evaluation_agent.validate(
-            query=f"""initial_response:\n{request.query_text}\n\nuser_context: {request.user_context.model_dump_json().lower()}""",
+            query=f"""question:\n{request.query_text}\nquestion_context:\n{response_text}\n\nuser_context:\n{request.user_context.model_dump_json(exclude='role').lower()}""",
             user_id=request.user_id,
             session_id=request.session_id,
             func=google_llm.arun,

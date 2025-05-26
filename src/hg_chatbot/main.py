@@ -4,6 +4,7 @@ from api.endpoints import app as api_app
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.endpoints import create_db_and_tables
 from core.discord import client
 from core.config import get_core_settings
 import logging
@@ -14,6 +15,8 @@ logger = logging.getLogger("main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    create_db_and_tables()
+
     from core.discord.bot import message_queue, workers, thread_pool
 
     bot_task = asyncio.create_task(client.start(get_core_settings().DISCORD_BOT_TOKEN))

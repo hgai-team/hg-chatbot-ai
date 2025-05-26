@@ -110,13 +110,13 @@ class MongoDBMemoryStore(BaseMemoryStore):
         user_id: str,
         **kwargs,
     ) -> List[str]:
-        """Get all session IDs for a user
+        """Get all chat history for a user
 
         Args:
             user_id: ID of the user
         """
-        results = self.collection.find({"user_id": user_id}, {"session_id": 1})
-        return [doc["session_id"] for doc in results]
+        results = self.collection.find({"user_id": user_id}, {"history": 1})
+        return [doc["history"] for doc in results]
 
     def delete_session(
         self,

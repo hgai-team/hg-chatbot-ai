@@ -26,6 +26,12 @@ app = APIRouter(
 
 APIKeyDep = Annotated[str, Depends(get_api_key)]
 
+async def tiktokenize(text: str):
+    import tiktoken
+
+    encoding = tiktoken.get_encoding("o200k_base")
+    return [encoding.decode_single_token_bytes(token).decode('utf-8') for token in encoding.encode(text)]
+
 @app.post(
     "/gemini_tokenizer",
 )
@@ -62,10 +68,8 @@ async def tiktoken(
 ):
     import tiktoken
 
-    encoding = tiktoken.get_encoding("o200k_base")
-
     try:
-        return [encoding.decode_single_token_bytes(token).strip() for token in encoding.encode(text)]
+        return await tiktokenize(text)
 
     except HTTPException as http_exc:
          raise http_exc

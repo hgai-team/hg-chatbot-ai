@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import Dict, Any
-
+from enum import Enum
 class UserContext(BaseModel):
     role: str
     departments: list[str] = []
@@ -8,10 +8,13 @@ class UserContext(BaseModel):
     projects: list[str] = []
     networks: list[str] = []
 
+class BotNames(str, Enum):
+    VAHACHA = "VaHaCha"
+
 class ChatRequest(BaseModel):
     query_text: str
 
-    bot_name: str
+    bot_name: BotNames
 
     session_id: str
     user_id: str

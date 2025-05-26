@@ -48,6 +48,52 @@ class FileProcessorTool:
         self.mongodb_doc_store = mongodb_doc_store
         self.qdrant_vector_store = qdrant_vector_store
 
+    async def _get_context_data(
+        self
+    ):
+        from api.routers.vahacha.info_permission import get_all_data
+
+        context_data = {}
+        response = await get_all_data()
+        for result in response['results']:
+            if result.type not in context_data:
+                context_data[result.type] = [result.name]
+            else:
+                context_data[result.type].append(result.name)
+
+        return context_data
+
+    async def _find_type(
+        self,
+        input_text,
+        context_data
+    ):
+        from services.tools.prompt import (
+            load_prompt,
+            apply_chat_template,
+            prepare_chat_messages
+        )
+
+        from services import get_openai_llm, get_settings_cached
+        from core.parsers import json_parser
+
+        openai_llm = get_openai_llm(
+            model_name=get_settings_cached().OPENAI_CHAT_MODEL
+        )
+
+        agent_config = load_prompt(get_settings_cached().VAHACHA_AGENT_PROMPT_PATH)['information_classifier']
+        prompt_template = load_prompt(get_settings_cached().BASE_PROMPT_PATH)
+
+        input_ = f"context_data:\n{context_data}\n\ninput_text:\n{input_text}\n"
+        prompt = apply_chat_template(
+            template=prompt_template,
+            **{**agent_config, **{"input": input_}}
+        )
+        messages = prepare_chat_messages(prompt=prompt)
+        response = await openai_llm.arun(messages)
+
+        return json_parser(response)
+
     async def _save_file(
         self,
         file_stream: io.BytesIO,
@@ -65,7 +111,8 @@ class FileProcessorTool:
     async def upload_excel_data(
         self,
         file: UploadFile,
-        use_pandas=False
+        use_pandas=False,
+        use_type=True,
     ):
         file_name, file_stream = await parse_file(file)
 
@@ -84,6 +131,12 @@ class FileProcessorTool:
             sheet_name=get_visible_sheets(file_stream),
             extra_info={"file_name": file_name}
         )
+
+        if use_type:
+            context_data = await self._get_context_data()
+            for i, doc in enumerate(docs):
+                extra_info = await self._find_type(doc.text, context_data)
+                docs[i].extra_info = {**doc.extra_info, **extra_info}
 
         tasks = [
             asyncio.create_task(self.store_docs(docs)),

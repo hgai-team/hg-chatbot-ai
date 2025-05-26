@@ -8,7 +8,9 @@ from fastapi import (
     Form
 )
 
-from api.schema import FilesResponse
+from typing import Literal
+
+from api.schema import FilesResponse, BotNames
 from api.security import get_api_key
 
 from services.tools import get_file_processor_tool
@@ -39,8 +41,8 @@ app = APIRouter(
     response_model=FilesResponse
 )
 async def delete_file(
+    bot_name: BotNames,
     file_name: str = Path(...),
-    bot_name: str = Form(...),
 ):
     file_processor = get_file_processor_tool(
         bot_name=bot_name
@@ -62,8 +64,9 @@ async def delete_file(
     response_model=FilesResponse
 )
 async def upload_excel_file(
+    bot_name: BotNames,
     file: UploadFile = File(...),
-    bot_name: str = Form(...),
+    use_type: bool = Literal[True, False]
 ):
     if not file.filename.endswith((".xlsx", ".xls", ".xlsm")):
         raise HTTPException(
@@ -77,8 +80,10 @@ async def upload_excel_file(
 
     try:
         response = await file_processor.upload_excel_data(
-            file=file
+            file=file,
+            use_type=use_type
         )
+        
         return FilesResponse(**response)
     except Exception as e:
         raise HTTPException(
@@ -93,8 +98,8 @@ async def upload_excel_file(
     response_model=FilesResponse
 )
 async def upload_pdf_file(
+    bot_name: BotNames,
     file: UploadFile = File(...),
-    bot_name: str = Form(...),
 ):
     if not file.filename.endswith((".pdf")):
         raise HTTPException(
@@ -123,8 +128,8 @@ async def upload_pdf_file(
     response_model=FilesResponse
 )
 async def upload_docx_file(
+    bot_name: BotNames,
     file: UploadFile = File(...),
-    bot_name: str = Form(...),
 ):
 
     if not file.filename.endswith((".docx")):

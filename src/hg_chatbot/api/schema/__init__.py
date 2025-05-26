@@ -1,17 +1,27 @@
-from .vector_search import (
+from .vahacha.vector_search import (
     SearchRequest,
     SearchResponse
 )
 
-from .files import FilesResponse
+from .vahacha.files import FilesResponse
 
-from .chatbots import ChatRequest, ChatResponse, UserContext
+from .vahacha.chatbots import ChatRequest, ChatResponse, UserContext, BotNames
+
+from .vahacha.info_permission import (
+    InfoPermission as vahacha_InfoPermission,
+    InfoPermissionInput as vahacha_InfoPermissionInput
+)
 
 __all__ = [
     "SearchRequest",
     "SearchResponse",
     "FilesResponse",
+
     "ChatRequest",
     "ChatResponse",
-    "UserContext"
+    "UserContext",
+    "BotNames",
+
+    "vahacha_InfoPermission",
+    "vahacha_InfoPermissionInput"
 ]

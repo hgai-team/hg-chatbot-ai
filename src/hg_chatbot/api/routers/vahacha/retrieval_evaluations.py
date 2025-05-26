@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from api.schema import SearchRequest, SearchResponse
+from api.schema import SearchRequest, SearchResponse, BotNames
 from api.security import get_api_key
 
 app = APIRouter(
@@ -31,7 +31,7 @@ APIKeyDep = Annotated[str, Depends(get_api_key)]
 async def retrieval_vector(
     api_key: APIKeyDep,
     request: SearchRequest,
-    bot_name: str,
+    bot_name: BotNames,
 ):
     search_tool = get_search_tool(
         bot_name=bot_name
@@ -59,8 +59,8 @@ async def retrieval_vector(
 async def retrieval_keywords(
     api_key: APIKeyDep,
     request: SearchRequest,
-    bot_name: str,
-    agent_prompt_path: str
+    agent_prompt_path: str,
+    bot_name: BotNames,
 ):
     query_analyzer = get_query_analyzer_agent(
         agent_prompt_path=agent_prompt_path

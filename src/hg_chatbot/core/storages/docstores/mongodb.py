@@ -82,7 +82,7 @@ class MongoDBDocumentStore(BaseDocumentStore):
 
     async def query(
         self, query: str, top_k: int = 20, doc_ids: Optional[list] = None, with_scores: bool = True
-    ): #-> List[Document]:
+    ):
         """Search document store using text search query"""
         try:
             find_filter = {"$text": {"$search": query}}
@@ -125,6 +125,72 @@ class MongoDBDocumentStore(BaseDocumentStore):
             )
             for doc in docs
         ]
+
+    async def user_query(
+        self,
+        query: str,
+        top_k: int = 20,
+        doc_ids: Optional[list] = None,
+        user_context: Optional[dict] = None,
+    ):
+        """Search document store using text search query + context filters."""
+        try:
+            # 1. Khởi tạo danh sách các điều kiện tìm kiếm
+            base_filters = [
+                {"$text": {"$search": query}}
+            ]
+            if doc_ids:
+                base_filters.append({"id": {"$in": doc_ids}})
+
+            # 2. Tạo danh sách OR-filters cho user_context + general
+            context_or = []
+            if user_context:
+                projs = user_context.get("projects")
+                if projs:
+                    context_or.append({"attributes.projects": {"$in": projs}})
+                nets = user_context.get("networks")
+                if nets:
+                    context_or.append({"attributes.networks": {"$in": nets}})
+                deps = user_context.get("departments")
+                if deps:
+                    context_or.append({"attributes.departments": {"$in": deps}})
+
+            context_or.append({"attributes.general": True})
+
+            # 3. Kết hợp: bắt buộc AND text-search và (OR context)
+            if context_or:
+                find_filter = {
+                    "$and": [
+                        {"$and": base_filters},
+                        {"$or": context_or}
+                    ]
+                }
+            else:
+                find_filter = {"$and": base_filters}
+
+            # 4. Thực thi query như trước
+            cursor = (
+                self.collection
+                    .find(find_filter, {"score": {"$meta": "textScore"}})
+                    .sort([("score", {"$meta": "textScore"})])
+                    .limit(top_k)
+            )
+
+            docs = list(cursor)
+
+        except Exception as e:
+            print(f"Error querying MongoDB: {e}")
+            docs = []
+
+        return [
+            Document(
+                id_=doc["id"],
+                text=doc.get("text", "<empty>"),
+                metadata=doc.get("attributes", {}),
+            )
+            for doc in docs
+        ]
+
 
     def get(self, ids: Union[List[str], str]) -> List[Document]:
         """Get document by id"""

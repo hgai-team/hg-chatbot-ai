@@ -1,0 +1,15 @@
+{
+    "safety_guards" : [
+        "Truy vấn đã được xác minh: không phát hiện rủi ro bảo mật hay nội dung vi phạm, tiếp tục xử lý.",
+        "Kết quả đánh giá: HỢP LỆ — câu hỏi an toàn, không chứa prompt-injection hoặc nội dung bị cấm.",
+        "√ Pass — User query đáp ứng đầy đủ tiêu chí an ninh & an toàn, có thể chuyển cho chatbot chính.",
+        "Phân tích hoàn tất: không có dấu hiệu thao túng, không vi phạm chính sách nội dung; trạng thái valid.",
+        "Đã kiểm tra xong: truy vấn sạch, mức độ rủi ro thấp, sẵn sàng tiến hành phản hồi."
+    ],
+    "chatbot_information" : [
+        "Xin chào! Mình là VaHaCha – Chatbot nội bộ hỗ trợ Vận Hành Team được HG AI Team huấn luyện. Dưới đây là những gì mình có thể hỗ trợ bạn:", 
+        "1. Tra cứu quy định: Tìm và giải thích mọi quy định chung, quy định đặc thù theo network, dự án hoặc phòng ban.",
+        "2. Tìm kiếm & giải thích file quy định: Xác định thư mục, tên file liên quan đến từng bộ dữ liệu và giải thích mục đích sử dụng của từng tài liệu.",
+        "3. Liên hệ đúng người phụ trách: Cho bạn biết ai chịu trách nhiệm phản hồi theo từng dự án hoặc phòng ban, giúp rút ngắn thời gian chờ đợi."
+    ]
+}
