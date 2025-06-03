@@ -4,7 +4,9 @@ from .vahacha.tokenizer import app as vahacha_tokenizer_router
 from .vahacha.agent_evaluations import app as vahacha_agent_evaluations_router
 from .vahacha.retrieval_evaluations import app as vahacha_retrieval_evaluations_router
 from .vahacha.history import app as vahacha_history_router
-from .vahacha.info_permission import app as vahacha_info_permission
+from .vahacha.info_permission import app as vahacha_info_permission_router
+
+from .auth import app as auth_router
 __all__ = [
     "vahacha_files_router",
     "vahacha_chatbots_router",
@@ -13,5 +15,7 @@ __all__ = [
     "vahacha_retrieval_evaluations_router",
     "vahacha_reranker_router",
     "vahacha_history_router",
-    "vahacha_info_permission"
+    "vahacha_info_permission_router",
+
+    "auth_router"
 ]

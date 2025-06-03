@@ -72,7 +72,7 @@ def get_context_retrieval_service(
         agent_prompt_path = settings.VAHACHA_AGENT_PROMPT_PATH
 
     google_llm = get_google_genai_llm(
-        model_name=get_settings_cached().GOOGLEAI_MODEL_THINKING,
+        model_name=get_settings_cached().GOOGLEAI_MODEL,
     )
 
     return ContextRetrievalService(

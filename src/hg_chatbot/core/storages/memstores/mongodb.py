@@ -25,11 +25,23 @@ class MongoDBMemoryStore(BaseMemoryStore):
             collection_name: Name of the collection to use
         """
         self.client = MongoClient(connection_string if connection_string else get_core_settings().MONGODB_CONNECTION_STRING)
-        self.db: Database = self.client[database_name if database_name else get_core_settings().MONGODB_DATABASE_NAME]
-        self.collection: Collection = self.db[collection_name if collection_name else get_core_settings().MONGODB_CHAT_COLLECTION_NAME]
+        self.db: Database = self.client[database_name if database_name else get_core_settings().MONGODB_BASE_DATABASE_NAME]
+        self.collection: Collection = self.db[collection_name if collection_name else get_core_settings().MONGODB_BASE_CHAT_HISTORY_COLLECTION_NAME]
 
         self.collection.create_index([("user_id", 1)])
         self.collection.create_index([("session_id", 1)])
+        
+    def add_rating(
+        self,
+        chat_id: str,
+        rating_type: str
+    ):
+        self.collection.update_one(
+            {"history.chat_id": chat_id}, 
+            {
+                "$set": {"history.$.rating": rating_type} 
+            }
+        )
 
     def add_chat(
         self,
@@ -59,13 +71,17 @@ class MongoDBMemoryStore(BaseMemoryStore):
                             "message": chat.message,
                             "response": chat.response,
                             "context": chat.context,
-                            "timestamp": chat.timestamp
+                            "timestamp": chat.timestamp,
+                            "chat_id": chat.chat_id,
+                            "rating": chat.rating
                         }
                     },
                     "$set": {"last_updated": current_time}
                 }
             )
         else:
+            from services.tools.prompt import prepare_chat_messages
+
             new_chat_history = {
                 "session_id": session_id,
                 "user_id": user_id,
@@ -74,11 +90,30 @@ class MongoDBMemoryStore(BaseMemoryStore):
                         "message": chat.message,
                         "response": chat.response,
                         "context": chat.context,
-                        "timestamp": chat.timestamp
+                        "timestamp": chat.timestamp,
+                        "chat_id": chat.chat_id,
+                        "rating": chat.rating
                     }
                 ],
                 "created_at": current_time,
-                "last_updated": current_time
+                "last_updated": current_time,
+                "session_title": kwargs.get('llm').run(
+                    messages=prepare_chat_messages(
+                        system_prompt="""
+                            Chat Thread Title Expert: Bạn là chuyên gia chuyên tạo tiêu đề cho luồng chat. Nhiệm vụ của bạn là dựa vào câu hỏi gốc để sinh ra một tiêu đề ngắn gọn, súc tích, phản ánh đúng chủ đề của luồng.
+                            1. Nhận tham số:
+                                - question: nội dung câu hỏi gốc.
+                            2. Phân tích và tổng hợp thông tin để tạo tiêu đề ngắn gọn, dễ hiểu và hấp dẫn, khái quát nội dung luồng chat.
+                            3. Đầu ra phải là một đoạn text ngắn gọn dài từ 15 đến 30 ký tự.
+                        """,
+                        prompt=f"""
+                            #Input:
+                                question: 
+                                {chat.message}
+                            #Output:
+                        """
+                    )
+                )
             }
             self.collection.insert_one(new_chat_history)
 
@@ -101,7 +136,8 @@ class MongoDBMemoryStore(BaseMemoryStore):
                 user_id=result["user_id"],
                 history=result["history"],
                 created_at=result.get("created_at"),
-                last_updated=result.get("last_updated")
+                last_updated=result.get("last_updated"),
+                session_title=result.get("session_title"),
             )
         return ChatHistory(session_id=session_id, user_id=user_id)
 

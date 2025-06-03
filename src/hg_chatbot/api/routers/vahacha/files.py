@@ -5,13 +5,12 @@ from fastapi import (
     File,
     Path,
     Depends,
-    Form
 )
 
 from typing import Literal
 
 from api.schema import FilesResponse, BotNames
-from api.security import get_api_key
+from api.security import validate_auth
 
 from services.tools import get_file_processor_tool
 
@@ -22,7 +21,7 @@ app = APIRouter(
 
 # @app.get(
 #     "/{file_name}",
-#     dependencies=[Depends(get_api_key)],
+#     dependencies=[Depends(validate_auth)],
 #     response_model=FilesResponse
 # )
 # async def get_file_info(file_name: str = Path(...)):
@@ -37,7 +36,7 @@ app = APIRouter(
 
 @app.delete(
     "/{file_name}",
-    dependencies=[Depends(get_api_key)],
+    dependencies=[Depends(validate_auth)],
     response_model=FilesResponse
 )
 async def delete_file(
@@ -60,7 +59,7 @@ async def delete_file(
 
 @app.post(
     "/excel",
-    dependencies=[Depends(get_api_key)],
+    dependencies=[Depends(validate_auth)],
     response_model=FilesResponse
 )
 async def upload_excel_file(
@@ -83,7 +82,7 @@ async def upload_excel_file(
             file=file,
             use_type=use_type
         )
-        
+
         return FilesResponse(**response)
     except Exception as e:
         raise HTTPException(
@@ -94,7 +93,7 @@ async def upload_excel_file(
 
 @app.post(
     "/pdf",
-    dependencies=[Depends(get_api_key)],
+    dependencies=[Depends(validate_auth)],
     response_model=FilesResponse
 )
 async def upload_pdf_file(
@@ -124,7 +123,7 @@ async def upload_pdf_file(
 
 @app.post(
     "/docx",
-    dependencies=[Depends(get_api_key)],
+    dependencies=[Depends(validate_auth)],
     response_model=FilesResponse
 )
 async def upload_docx_file(

@@ -1,9 +1,7 @@
-from typing import Annotated
-
 from fastapi import APIRouter, Depends, HTTPException
 
-from api.schema import SearchRequest, SearchResponse, BotNames
-from api.security import get_api_key
+from api.schema import SearchRequest, BotNames
+from api.security import validate_auth
 
 app = APIRouter(
     prefix="/retrieval",
@@ -23,13 +21,11 @@ from services.tools import (
     get_search_tool,
 )
 
-APIKeyDep = Annotated[str, Depends(get_api_key)]
-
 @app.post(
     "/vector",
+    dependencies=[Depends(validate_auth)]
 )
 async def retrieval_vector(
-    api_key: APIKeyDep,
     request: SearchRequest,
     bot_name: BotNames,
 ):
@@ -55,9 +51,9 @@ async def retrieval_vector(
 
 @app.post(
     "/keywords",
+    dependencies=[Depends(validate_auth)]
 )
 async def retrieval_keywords(
-    api_key: APIKeyDep,
     request: SearchRequest,
     agent_prompt_path: str,
     bot_name: BotNames,
@@ -103,27 +99,3 @@ async def retrieval_keywords(
             status_code=500,
             detail=str(e)
         )
-
-# @app.post(
-#     "/bm25",
-# )
-# async def retrieval_keywords(
-#     api_key: APIKeyDep,
-#     search_tool: SearchToolDep,
-#     request: SearchRequest,
-# ):
-#     try:
-#         docs = await search_tool.find_documents_by_bm25(
-#             query=request.query_text.lower(),
-#             top_k=request.top_k,
-#         )
-#         return {
-#             "documents": docs
-#         }
-
-
-#     except Exception as e:
-#         raise HTTPException(
-#             status_code=500,
-#             detail=str(e)
-#         )

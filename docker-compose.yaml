@@ -1,0 +1,61 @@
+services:
+  hg-chatbot:
+    image: krntl/hgcb:latest
+    ports:
+      - 18888:18888
+    volumes:
+      - "./src/hg_chatbot:/app"
+    networks:
+      - hg-chatbot-network
+    command: uvicorn main:app --host 0.0.0.0 --port 18888 --reload
+    depends_on:
+      - mongodb-hg-chatbot
+      - qdrant-hg-chatbot
+
+  mongodb-hg-chatbot:
+    image: mongodb/mongodb-community-server:7.0.11-ubuntu2204
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGODB_INITDB_ROOT_USERNAME=$(MONGODB_INITDB_ROOT_USERNAME)
+      - MONGODB_INITDB_ROOT_PASSWORD=$(MONGODB_INITDB_ROOT_PASSWORD)
+    volumes:
+      - docker_mongodb_data:/data/db
+    networks:
+      - hg-chatbot-network
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G
+          cpus: '1.25'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  qdrant-hg-chatbot:
+    image: qdrant/qdrant:v1.14.1
+    ports:
+      - 6333:6333
+      - 6334:6334
+    volumes:
+      - docker_qdrant_data:/qdrant/storage
+    networks:
+      - hg-chatbot-network
+    deploy:
+        resources:
+          limits:
+            memory: 1.5G
+            cpus: '1.25'
+          reservations:
+            memory: 512M
+            cpus: '0.5'
+
+networks:
+  hg-chatbot-network:
+    external: true
+
+volumes:
+  docker_qdrant_data:
+    external: true
+  docker_mongodb_data:
+    external: true

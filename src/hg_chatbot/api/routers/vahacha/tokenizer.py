@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-from typing import Annotated
 
-from api.security import get_api_key
+from api.security import validate_auth
 
 from core.parsers import json_parser
 
@@ -24,19 +23,29 @@ app = APIRouter(
     tags=["Tokenizer"]
 )
 
-APIKeyDep = Annotated[str, Depends(get_api_key)]
-
-async def tiktokenize(text: str):
+async def tiktokenize(text: str) -> list[str]:
     import tiktoken
 
     encoding = tiktoken.get_encoding("o200k_base")
-    return [encoding.decode_single_token_bytes(token).decode('utf-8') for token in encoding.encode(text)]
+
+    token_ids = encoding.encode(text)
+
+    tokens: list[str] = []
+    for tid in token_ids:
+        try:
+            token_str = encoding.decode_single_token_str(tid)
+        except AttributeError:
+            token_str = encoding.decode([tid])
+        tokens.append(token_str)
+
+    return tokens
+
 
 @app.post(
     "/gemini_tokenizer",
+    dependencies=[Depends(validate_auth)]
 )
 async def gemini_tokenizer(
-    api_key: APIKeyDep,
     text: str
 ):
     google_llm = get_google_genai_llm(
@@ -61,13 +70,11 @@ async def gemini_tokenizer(
 
 @app.post(
     "/tiktoken",
+    dependencies=[Depends(validate_auth)]
 )
 async def tiktoken(
-    api_key: APIKeyDep,
     text: str
 ):
-    import tiktoken
-
     try:
         return await tiktokenize(text)
 

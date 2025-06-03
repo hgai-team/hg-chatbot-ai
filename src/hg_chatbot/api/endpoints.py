@@ -8,10 +8,12 @@ from api.routers import (
     vahacha_agent_evaluations_router,
     vahacha_retrieval_evaluations_router,
     vahacha_history_router,
-    vahacha_info_permission
+    vahacha_info_permission_router,
+
+    auth_router
 )
 
-from api.security import get_api_key
+from api.security import validate_auth
 from api.schema import vahacha_InfoPermission
 from services import get_settings_cached
 
@@ -29,10 +31,12 @@ app = APIRouter(
 
 @app.get(
     "/",
-    dependencies=[Depends(get_api_key)],
+    dependencies=[Depends(validate_auth)],
 )
 def health_check():
     return {"status": 200}
+
+app.include_router(auth_router)
 
 app.include_router(vahacha_files_router)
 app.include_router(vahacha_chatbots_router)
@@ -40,4 +44,6 @@ app.include_router(vahacha_tokenizer_router)
 app.include_router(vahacha_agent_evaluations_router)
 app.include_router(vahacha_retrieval_evaluations_router)
 app.include_router(vahacha_history_router)
-app.include_router(vahacha_info_permission)
+app.include_router(vahacha_info_permission_router)
+
+

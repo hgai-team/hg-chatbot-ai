@@ -25,3 +25,6 @@ python-multipart
 pydantic_settings
 sqlmodel
 alembic
+
+PyJWT 
+cryptography

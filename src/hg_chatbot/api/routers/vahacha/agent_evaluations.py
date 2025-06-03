@@ -1,10 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
-from typing import Annotated
 
-from api.security import get_api_key
+from api.security import validate_auth
 from api.schema import ChatRequest
-
-from core.parsers import json_parser
 
 from services import (
     get_settings_cached,
@@ -15,14 +12,12 @@ app = APIRouter(
     tags=["Evaluations"]
 )
 
-APIKeyDep = Annotated[str, Depends(get_api_key)]
-
 @app.post(
     "/safety_guard",
+    dependencies=[Depends(validate_auth)]
 )
 async def safety_guard(
     request: ChatRequest,
-    api_key: APIKeyDep,
     agent_prompt_path: str = None,
 ):
     from services.agentic_workflow.vahacha import (
@@ -59,10 +54,10 @@ async def safety_guard(
 
 @app.post(
     "/query_classifier",
+    dependencies=[Depends(validate_auth)]
 )
 async def query_classifier(
     request: ChatRequest,
-    api_key: APIKeyDep,
     agent_prompt_path: str = None,
 ):
     from services.agentic_workflow.vahacha import (
@@ -99,9 +94,9 @@ async def query_classifier(
 
 @app.post(
     "/query_preprocessor",
+    dependencies=[Depends(validate_auth)]
 )
 async def query_preprocessor(
-    api_key: APIKeyDep,
     query: str,
     user_id: str,
     session_id: str,
@@ -123,7 +118,6 @@ async def query_preprocessor(
         model_name=get_settings_cached().GOOGLEAI_MODEL
     )
 
-
     try:
         query_preprocessor_response = await evaluation_agent.validate(
             query=query.lower().strip(),
@@ -142,9 +136,9 @@ async def query_preprocessor(
 
 @app.post(
     "/keyword_extractor",
+    dependencies=[Depends(validate_auth)]
 )
 async def keyword_extractor(
-    api_key: APIKeyDep,
     queries: list[str],
     user_id: str,
     session_id: str,
@@ -184,10 +178,10 @@ async def keyword_extractor(
 
 @app.post(
     "/response_permission_editor",
+    dependencies=[Depends(validate_auth)]
 )
 async def response_permission_editor(
     request: ChatRequest,
-    api_key: APIKeyDep,
     response_text: str = Body(...)
 ):
     from services.agentic_workflow.vahacha import (

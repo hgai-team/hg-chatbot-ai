@@ -1,10 +1,8 @@
 from uuid import uuid4
 from fastapi import (
     APIRouter,
-    HTTPException,
-    Depends,
-    Query,
-    Path
+    Path,
+    Depends
 )
 from sqlmodel import (
     Session,
@@ -13,9 +11,8 @@ from sqlmodel import (
     update,
     delete
 )
-from typing import List
 
-
+from api.security import validate_auth
 from api.schema import vahacha_InfoPermissionInput, vahacha_InfoPermission
 from services import get_settings_cached
 
@@ -27,9 +24,15 @@ def get_session():
     )
     return Session(engine)
 
-app = APIRouter(prefix="/vahacha/info-permission", tags=["Info Permission"])
+app = APIRouter(
+    prefix="/vahacha/info-permission",
+    tags=["Info Permission"]
+)
 
-@app.post("/create")
+@app.post(
+    "/create",
+    dependencies=[Depends(validate_auth)]
+)
 async def create_data(
     input_: vahacha_InfoPermissionInput,
 ):
@@ -45,7 +48,10 @@ async def create_data(
 
     return {'status': 200}
 
-@app.post("/get-all")
+@app.post(
+    "/get-all",
+    dependencies=[Depends(validate_auth)]
+)
 async def get_all_data():
 
     with get_session() as session:
@@ -56,7 +62,10 @@ async def get_all_data():
         'status': 200
     }
 
-@app.post("/get-all/{type}")
+@app.post(
+    "/get-all/{type}",
+    dependencies=[Depends(validate_auth)]
+)
 async def get_all_type_data(
     type: str = Path(...)
 ):
@@ -69,7 +78,10 @@ async def get_all_type_data(
         'status': 200
     }
 
-@app.post("/update")
+@app.post(
+    "/update",
+    dependencies=[Depends(validate_auth)]
+)
 async def update_data(
     input_: vahacha_InfoPermission
 ):
@@ -88,7 +100,10 @@ async def update_data(
         'status': 200
     }
 
-@app.delete("/delete")
+@app.delete(
+    "/delete",
+    dependencies=[Depends(validate_auth)]
+)
 async def delete_data(
     id_: str
 ):
@@ -102,7 +117,10 @@ async def delete_data(
         'status': 200
     }
 
-@app.delete("/delete")
+@app.delete(
+    "/delete",
+    dependencies=[Depends(validate_auth)]
+)
 async def delete_data(
     id_: str
 ):
@@ -116,7 +134,10 @@ async def delete_data(
         'status': 200
     }
 
-@app.delete("/delete-all")
+@app.delete(
+    "/delete-all",
+    dependencies=[Depends(validate_auth)]
+)
 async def delete_all_data():
     with get_session() as session:
         session.exec(

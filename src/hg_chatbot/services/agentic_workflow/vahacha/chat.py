@@ -18,6 +18,8 @@ from .query_processor import QueryProcessingService
 from .context_retriever import ContextRetrievalService
 from .prompt_formatter import PromptFormattingService
 
+from uuid import uuid4
+
 class ChatService:
     def __init__(
         self,
@@ -80,8 +82,18 @@ class ChatService:
                     "source_document_ids": [id_ for id_, _ in retrieved_context.source_documents.items()]
                 },
                 timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                chat_id=str(uuid4())
             )
-            _ = await self._run_sync_in_thread(self.memory_store.add_chat, user_id, session_id, chat_to_store)
+            
+            from services import get_google_genai_llm
+            _ = await self._run_sync_in_thread(
+                lambda: self.memory_store.add_chat(
+                    user_id=user_id,
+                    session_id=session_id,
+                    chat=chat_to_store,
+                    llm=get_google_genai_llm(model_name="models/gemini-2.0-flash")
+                )
+            )
 
             return response_text
 
@@ -136,8 +148,18 @@ class ChatService:
                     "source_document_ids": [id_ for id_, _ in retrieved_context.source_documents.items()]
                 },
                 timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                chat_id=str(uuid4())
             )
-            _ = await self._run_sync_in_thread(self.memory_store.add_chat, user_id, session_id, chat_to_store)
+            
+            from services import get_google_genai_llm
+            _ = await self._run_sync_in_thread(
+                lambda: self.memory_store.add_chat(
+                    user_id=user_id,
+                    session_id=session_id,
+                    chat=chat_to_store,
+                    llm=get_google_genai_llm(model_name="models/gemini-2.0-flash")
+                )
+            )
 
             yield {'_type': 'response', 'text': response_text} 
 
@@ -234,8 +256,17 @@ class ChatService:
                     "source_document_ids": [id_ for id_, _ in retrieved_context.source_documents.items()]
                 },
                 timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                chat_id=str(uuid4())
             )
-            _ = await self._run_sync_in_thread(self.memory_store.add_chat, user_id, session_id, chat_to_store)
+            
+            __ = await self._run_sync_in_thread(
+                lambda: self.memory_store.add_chat(
+                    user_id=user_id,
+                    session_id=session_id,
+                    chat=chat_to_store,
+                    llm=get_google_genai_llm(model_name="models/gemini-2.0-flash")
+                )
+            )
 
             return response_text
 
@@ -310,8 +341,17 @@ class ChatService:
                     "source_document_ids": [id_ for id_, _ in retrieved_context.source_documents.items()]
                 },
                 timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                chat_id=str(uuid4())
             )
-            _ = await self._run_sync_in_thread(self.memory_store.add_chat, user_id, session_id, chat_to_store)
+            
+            _ = await self._run_sync_in_thread(
+                lambda: self.memory_store.add_chat(
+                    user_id=user_id,
+                    session_id=session_id,
+                    chat=chat_to_store,
+                    llm=get_google_genai_llm(model_name="models/gemini-2.0-flash")
+                )
+            )
 
             yield {'_type': 'response', 'text': response_text} 
 

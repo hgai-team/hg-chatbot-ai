@@ -1,19 +1,24 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional, Union, Dict, Any
 from datetime import datetime
+from uuid import uuid4
 
 class BaseChat:
     def __init__(
         self,
         message: str,
         response: str,
+        chat_id: str,
         context: Optional[Dict[str, Any]] = None,
-        timestamp: Optional[datetime] = None
+        timestamp: Optional[datetime] = None,
+        rating: Optional[str] = None
     ):
         self.message = message
         self.response = response
         self.context = context or {}
         self.timestamp = timestamp or datetime.now()
+        self.chat_id = chat_id
+        self.rating = rating
 
 class ChatHistory:
     """Represents a single chat message"""
@@ -23,14 +28,15 @@ class ChatHistory:
         user_id: str,
         history: Optional[list] = [],
         created_at: Optional[datetime] = None,
-        last_updated: Optional[datetime] = None
+        last_updated: Optional[datetime] = None,
+        session_title: Optional[str] = None,
     ):
         self.user_id = user_id
         self.session_id = session_id
         self.history = history
         self.created_at = created_at or datetime.now()
         self.last_updated = last_updated or datetime.now()
-
+        self.session_title = session_title
 
 class BaseMemoryStore(ABC):
     """A memory store is responsible for storing and managing chat history"""

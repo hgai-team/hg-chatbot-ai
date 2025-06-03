@@ -4,8 +4,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class CoreSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    API_KEY: str
-
     OPENAI_CHAT_MODEL: str
     OPENAI_CODE_MODEL: str
     OPENAI_TEXT_EMBEDDING_MODEL: str

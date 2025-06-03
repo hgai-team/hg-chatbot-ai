@@ -8,10 +8,9 @@ from fastapi import (
 
 from api.schema import BotNames
 
-from api.security import get_api_key
+from api.security import validate_auth
 
 from services import (
-    get_settings_cached,
     get_mongodb_memory_store
 )
 
@@ -22,7 +21,7 @@ app = APIRouter(
 
 @app.get(
     "/session",
-    dependencies=[Depends(get_api_key)],
+    dependencies=[Depends(validate_auth)],
 )
 async def get_session_history(
     user_id: str,
@@ -42,6 +41,36 @@ async def get_session_history(
         )
         return {
             'results': history.history,
+            'session_title': history.session_title
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+        
+@app.post(
+    "/session/rating",
+    dependencies=[Depends(validate_auth)],
+)
+async def add_rating(
+    chat_id: str,
+    rating_type: str,
+    bot_name: BotNames,
+):
+
+    memory_store = get_mongodb_memory_store(
+        database_name=bot_name,
+        collection_name=bot_name,
+    )
+
+    try:
+        memory_store.add_rating(
+            chat_id=chat_id,
+            rating_type=rating_type,
+        ) 
+        return {
+            "status": 200
         }
     except Exception as e:
         raise HTTPException(
@@ -51,7 +80,7 @@ async def get_session_history(
 
 @app.get(
     "/sessions",
-    dependencies=[Depends(get_api_key)],
+    dependencies=[Depends(validate_auth)],
 )
 async def get_user_sessions(
     user_id: str,

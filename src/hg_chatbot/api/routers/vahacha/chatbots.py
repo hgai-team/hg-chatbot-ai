@@ -4,10 +4,9 @@ import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from typing import Annotated
 
 from api.schema import ChatRequest, ChatResponse, BotNames
-from api.security import get_api_key
+from api.security import validate_auth
 from api.routers.vahacha.tokenizer import tiktokenize
 
 from services import get_settings_cached
@@ -18,10 +17,8 @@ app = APIRouter(
     tags=["ChatBots"]
 )
 
-APIKeyDep = Annotated[str, Depends(get_api_key)]
-
 async def yield_data(
-    _type: str, 
+    _type: str,
     text: str
 ):
     return f"""data: {
@@ -44,6 +41,7 @@ async def store_chat(
 ):
     from datetime import datetime
     from core.storages import BaseChat
+    from uuid import uuid4
     chat_to_store = BaseChat(
         message=query_text,
         response=response_text,
@@ -51,22 +49,24 @@ async def store_chat(
             "source_document_ids": source_document_ids
         },
         timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        chat_id=str(uuid4())
     )
     _ = await obj._run_sync_in_thread(obj.memory_store.add_chat, user_id, session_id, chat_to_store)
 
 @app.get(
     "/vahacha/get-vh-info",
+    dependencies=[Depends(validate_auth)]
 )
 async def get_vh_info(
     bot_name: BotNames
 ):
     from services.tools import get_search_tool
     from core.base import Document
-    
+
     search_tool = get_search_tool(bot_name=bot_name)
-    
+
     collection = search_tool.mongodb_doc_store.collection
-    
+
     find_filter = {
         "$and": [
             {"attributes.file_name": "Hệ thống nhân sự Vận hành.xlsx"},
@@ -75,7 +75,7 @@ async def get_vh_info(
     cursor = (collection.find(find_filter))
 
     docs = list(cursor)
-    
+
     return [
         Document(
             id_=doc["id"],
@@ -88,11 +88,11 @@ async def get_vh_info(
 
 @app.post(
     "/vahacha/agentic-workflow/admin",
-    response_model=ChatResponse
+    response_model=ChatResponse,
+    dependencies=[Depends(validate_auth)]
 )
 async def chat_admin(
     request: ChatRequest,
-    api_key: APIKeyDep,
 ):
     from services.agentic_workflow.vahacha import get_chat_service
 
@@ -117,29 +117,31 @@ async def chat_admin(
         raise http_exc
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
-    
-@app.post("/vahacha/agentic-workflow/admin/stream")
+
+@app.post(
+    "/vahacha/agentic-workflow/admin/stream",
+    dependencies=[Depends(validate_auth)]
+)
 async def chat_admin_stream(
     request: ChatRequest,
-    api_key: str = Depends(get_api_key)
 ):
     async def stream_generator():
         from services.agentic_workflow.vahacha import get_chat_service
-        
+
         yield await yield_data('header_thinking', "Đang xử lý...\n")
 
         chat_service = get_chat_service(
             bot_name=request.bot_name,
             agent_prompt_path=get_settings_cached().VAHACHA_AGENT_PROMPT_PATH
         )
-        
+
         async for data in chat_service.process_chat_request_stream(
             query_text=request.query_text.lower(),
             user_id=request.user_id,
             session_id=request.session_id,
         ):
             yield await yield_data(**data)
-            
+
         yield await yield_data('end', 'Hoàn thành!\n')
 
     return StreamingResponse(
@@ -149,11 +151,11 @@ async def chat_admin_stream(
 
 @app.post(
     "/vahacha/agentic-workflow/user",
-    response_model=ChatResponse
+    response_model=ChatResponse,
+    dependencies=[Depends(validate_auth)]
 )
 async def chat_user(
     request: ChatRequest,
-    api_key: APIKeyDep,
 ):
     from services.agentic_workflow.vahacha import (
         get_chat_service,
@@ -176,7 +178,7 @@ async def chat_user(
     )
 
     google_llm = get_google_genai_llm(
-        model_name=get_settings_cached().GOOGLEAI_MODEL_THINKING
+        model_name=get_settings_cached().GOOGLEAI_MODEL
     )
 
     try:
@@ -240,11 +242,13 @@ async def chat_user(
         raise http_exc
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
-    
-@app.post("/vahacha/agentic-workflow/user/stream")
+
+@app.post(
+    "/vahacha/agentic-workflow/user/stream",
+    dependencies=[Depends(validate_auth)]
+)
 async def chat_user_stream(
     request: ChatRequest,
-    api_key: str = Depends(get_api_key)
 ):
     async def stream_generator():
         import random
@@ -333,7 +337,7 @@ async def chat_user_stream(
                 response_text="\n".join(agent_thinking_data['chatbot_information'])
             )
             return
-        
+
         async for data in chat_service.user_process_chat_request_stream(
             query_text=request.query_text.lower(),
             user_id=request.user_id,
@@ -341,9 +345,9 @@ async def chat_user_stream(
             user_context=request.user_context
         ):
             yield await yield_data(**data)
-        
+
         yield await yield_data('end', 'Hoàn thành!\n')
-            
+
 
     return StreamingResponse(
         stream_generator(),
