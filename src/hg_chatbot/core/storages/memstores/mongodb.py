@@ -30,16 +30,20 @@ class MongoDBMemoryStore(BaseMemoryStore):
 
         self.collection.create_index([("user_id", 1)])
         self.collection.create_index([("session_id", 1)])
-        
+
     def add_rating(
         self,
         chat_id: str,
-        rating_type: str
+        rating_type: str,
+        rating_text: str
     ):
         self.collection.update_one(
-            {"history.chat_id": chat_id}, 
+            {"history.chat_id": chat_id},
             {
-                "$set": {"history.$.rating": rating_type} 
+                "$set": {
+                    "history.$.rating_type": rating_type,
+                    "history.$.rating_text": rating_text
+                },
             }
         )
 
@@ -73,12 +77,14 @@ class MongoDBMemoryStore(BaseMemoryStore):
                             "context": chat.context,
                             "timestamp": chat.timestamp,
                             "chat_id": chat.chat_id,
-                            "rating": chat.rating
+                            "rating_type": chat.rating_type,
+                            "rating_text": chat.rating_text,
                         }
                     },
                     "$set": {"last_updated": current_time}
                 }
             )
+            return None
         else:
             from services.tools.prompt import prepare_chat_messages
 
@@ -92,7 +98,8 @@ class MongoDBMemoryStore(BaseMemoryStore):
                         "context": chat.context,
                         "timestamp": chat.timestamp,
                         "chat_id": chat.chat_id,
-                        "rating": chat.rating
+                        "rating_type": chat.rating_type,
+                        "rating_text": chat.rating_text,
                     }
                 ],
                 "created_at": current_time,
@@ -108,7 +115,7 @@ class MongoDBMemoryStore(BaseMemoryStore):
                         """,
                         prompt=f"""
                             #Input:
-                                question: 
+                                question:
                                 {chat.message}
                             #Output:
                         """
@@ -116,6 +123,7 @@ class MongoDBMemoryStore(BaseMemoryStore):
                 )
             }
             self.collection.insert_one(new_chat_history)
+            return new_chat_history["session_title"]
 
     def get_session_history(
         self,

@@ -7,9 +7,9 @@
         "Đã kiểm tra xong: truy vấn sạch, mức độ rủi ro thấp, sẵn sàng tiến hành phản hồi."
     ],
     "chatbot_information" : [
-        "Xin chào! Mình là VaHaCha – Chatbot nội bộ hỗ trợ Vận Hành Team được HG AI Team huấn luyện. Dưới đây là những gì mình có thể hỗ trợ bạn:", 
-        "1. Tra cứu quy định: Tìm và giải thích mọi quy định chung, quy định đặc thù theo network, dự án hoặc phòng ban.",
-        "2. Tìm kiếm & giải thích file quy định: Xác định thư mục, tên file liên quan đến từng bộ dữ liệu và giải thích mục đích sử dụng của từng tài liệu.",
-        "3. Liên hệ đúng người phụ trách: Cho bạn biết ai chịu trách nhiệm phản hồi theo từng dự án hoặc phòng ban, giúp rút ngắn thời gian chờ đợi."
+        "Xin chào! Mình là VaHaCha – Chatbot nội bộ hỗ trợ Vận Hành Team được HG AI Team huấn luyện. Dưới đây là những gì mình có thể hỗ trợ bạn:\n",
+        "   1. Tra cứu quy định: Tìm và giải thích mọi quy định chung, quy định đặc thù theo network, dự án hoặc phòng ban.\n",
+        "   2. Tìm kiếm & giải thích file quy định: Xác định thư mục, tên file liên quan đến từng bộ dữ liệu và giải thích mục đích sử dụng của từng tài liệu.\n",
+        "   3. Liên hệ đúng người phụ trách: Cho bạn biết ai chịu trách nhiệm phản hồi theo từng dự án hoặc phòng ban, giúp rút ngắn thời gian chờ đợi.\n"
     ]
 }

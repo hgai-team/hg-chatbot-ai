@@ -7,7 +7,7 @@ services:
       - "./src/hg_chatbot:/app"
     networks:
       - hg-chatbot-network
-    command: uvicorn main:app --host 0.0.0.0 --port 18888 --reload
+    command: uvicorn main:app --host 0.0.0.0 --port 18888
     depends_on:
       - mongodb-hg-chatbot
       - qdrant-hg-chatbot

@@ -48,7 +48,7 @@ async def get_session_history(
             status_code=500,
             detail=str(e)
         )
-        
+
 @app.post(
     "/session/rating",
     dependencies=[Depends(validate_auth)],
@@ -56,6 +56,7 @@ async def get_session_history(
 async def add_rating(
     chat_id: str,
     rating_type: str,
+    rating_text: str,
     bot_name: BotNames,
 ):
 
@@ -68,7 +69,8 @@ async def add_rating(
         memory_store.add_rating(
             chat_id=chat_id,
             rating_type=rating_type,
-        ) 
+            rating_text=rating_text
+        )
         return {
             "status": 200
         }
@@ -78,30 +80,30 @@ async def add_rating(
             detail=str(e)
         )
 
-@app.get(
-    "/sessions",
-    dependencies=[Depends(validate_auth)],
-)
-async def get_user_sessions(
-    user_id: str,
-    bot_name: BotNames,
-):
+# @app.get(
+#     "/sessions",
+#     dependencies=[Depends(validate_auth)],
+# )
+# async def get_user_sessions(
+#     user_id: str,
+#     bot_name: BotNames,
+# ):
 
-    memory_store = get_mongodb_memory_store(
-        database_name=bot_name,
-        collection_name=bot_name,
-    )
+#     memory_store = get_mongodb_memory_store(
+#         database_name=bot_name,
+#         collection_name=bot_name,
+#     )
 
-    try:
-        history = memory_store.get_user_sessions(
-            user_id=user_id
-        )
-        return {
-            'results': history
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+#     try:
+#         history = memory_store.get_user_sessions(
+#             user_id=user_id
+#         )
+#         return {
+#             'results': history
+#         }
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code=500,
+#             detail=str(e)
+#         )
 

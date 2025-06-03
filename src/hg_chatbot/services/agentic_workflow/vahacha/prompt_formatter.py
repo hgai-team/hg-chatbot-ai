@@ -17,9 +17,10 @@ class PromptFormattingService:
         messages.extend(processed_info.history_messages)
         context_str = retrieved_context.context_string
         user_content = (
-            f"Câu hỏi của người dùng: {processed_info.original_query}\n\n"
-            f"CONTEXT:\n\n{context_str}\n\n"
-            f"INSTRUCTIONS:\n\n{processed_info.instructions}"
+            f"INSTRUCTIONS:\n{processed_info.instructions}\n\n"
+            f"Câu hỏi của người dùng:\n{processed_info.original_query}\n\n"
+            f"CONTEXT:\n{context_str}"
+
         )
         messages.append(ChatMessage(role=MessageRole.USER, content=user_content))
         return messages

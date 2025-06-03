@@ -7,11 +7,10 @@
 ```bash
 docker network create hg-chatbot-network
 
-docker compose -f docker-compose.qdrant.yml up -d
+docker volume create docker_qdrant_data
+docker volume create docker_mongodb_data
 
-docker compose -f docker-compose.mongodb.yml up -d
-
-docker compose -f docker-compose.hg-chatbot.yml up -d
+docker compose --env-file ./src/hg_chatbot/.env up -d
 ```
 
 ## Project Structure

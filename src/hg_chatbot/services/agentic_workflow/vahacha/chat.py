@@ -54,18 +54,18 @@ class ChatService:
         try:
             processed_info = await self.query_processor.analyze_query(
                 query_text=query_text,
-                user_id=user_id, 
+                user_id=user_id,
                 session_id=session_id
             )
-            
+
             retrieved_context = await self.context_retriever.retrieve_context(
-                processed_query_info=processed_info, 
-                user_id=user_id, 
+                processed_query_info=processed_info,
+                user_id=user_id,
                 session_id=session_id
             )
 
             inal_messages = self.prompt_formatter.format_chat_prompt(
-                processed_info=processed_info, 
+                processed_info=processed_info,
                 retrieved_context=retrieved_context
             )
 
@@ -84,7 +84,7 @@ class ChatService:
                 timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 chat_id=str(uuid4())
             )
-            
+
             from services import get_google_genai_llm
             _ = await self._run_sync_in_thread(
                 lambda: self.memory_store.add_chat(
@@ -101,7 +101,7 @@ class ChatService:
             raise http_exc
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"An internal error occurred during chat processing. {e}")
-    
+
     async def process_chat_request_stream(
         self,
         query_text: str,
@@ -110,29 +110,29 @@ class ChatService:
     ):
         try:
             yield {'_type': 'header_thinking', 'text': 'Đang phân tích yêu cầu...\n'}
-            
+
             processed_info = await self.query_processor.analyze_query(
                 query_text=query_text,
-                user_id=user_id, 
+                user_id=user_id,
                 session_id=session_id
             )
             yield {'_type': 'thinking', 'text': 'Hoàn thành phân tích!\n'}
-            
+
             yield {'_type': 'header_thinking', 'text': 'Đang tìm kiếm thông tin...\n'}
-            
+
             retrieved_context = await self.context_retriever.retrieve_context(
-                processed_query_info=processed_info, 
-                user_id=user_id, 
+                processed_query_info=processed_info,
+                user_id=user_id,
                 session_id=session_id
             )
-            
+
             yield {'_type': 'thinking', 'text': 'Hoàn thành tìm kiếm thông tin!\n'}
 
             inal_messages = self.prompt_formatter.format_chat_prompt(
-                processed_info=processed_info, 
+                processed_info=processed_info,
                 retrieved_context=retrieved_context
             )
-            
+
             yield {'_type': 'header_thinking', 'text': 'Đang phản hồi yêu cầu...\n'}
 
             response_text = ""
@@ -141,6 +141,7 @@ class ChatService:
                 response_text = await self.main_llm.arun(messages=inal_messages)
             self.instrumentor.flush()
 
+            chat_id = str(uuid4())
             chat_to_store = BaseChat(
                 message=query_text,
                 response=response_text,
@@ -148,11 +149,11 @@ class ChatService:
                     "source_document_ids": [id_ for id_, _ in retrieved_context.source_documents.items()]
                 },
                 timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                chat_id=str(uuid4())
+                chat_id=chat_id
             )
-            
+
             from services import get_google_genai_llm
-            _ = await self._run_sync_in_thread(
+            session_title = await self._run_sync_in_thread(
                 lambda: self.memory_store.add_chat(
                     user_id=user_id,
                     session_id=session_id,
@@ -161,7 +162,11 @@ class ChatService:
                 )
             )
 
-            yield {'_type': 'response', 'text': response_text} 
+            yield {'_type': 'response', 'text': response_text}
+
+            if session_title:
+                yield {'_type': 'session_title', 'text': session_title}
+            yield {'_type': 'chat_id', 'text': chat_id}
 
         except HTTPException as http_exc:
             raise http_exc
@@ -223,7 +228,7 @@ class ChatService:
             )
 
             inal_messages = self.prompt_formatter.format_chat_prompt(
-                processed_info=processed_info, 
+                processed_info=processed_info,
                 retrieved_context=retrieved_context
             )
 
@@ -233,7 +238,7 @@ class ChatService:
                 response_text = await self.main_llm.arun(messages=inal_messages)
 
             self.instrumentor.flush()
-            
+
             from services import (
                 get_google_genai_llm,
                 get_settings_cached
@@ -258,8 +263,8 @@ class ChatService:
                 timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 chat_id=str(uuid4())
             )
-            
-            __ = await self._run_sync_in_thread(
+
+            _ = await self._run_sync_in_thread(
                 lambda: self.memory_store.add_chat(
                     user_id=user_id,
                     session_id=session_id,
@@ -274,7 +279,7 @@ class ChatService:
             raise http_exc
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"An internal error occurred during chat processing. {e}")
-        
+
     async def user_process_chat_request_stream(
         self,
         query_text: str,
@@ -284,15 +289,15 @@ class ChatService:
     ):
         try:
             yield {'_type': 'header_thinking', 'text': 'Đang phân tích yêu cầu...\n'}
-            
+
             processed_info = await self.query_processor.analyze_query(
                 query_text=query_text,
                 user_id=user_id,
                 session_id=session_id
             )
-            
+
             yield {'_type': 'thinking', 'text': 'Hoàn thành phân tích!\n'}
-            
+
             yield {'_type': 'header_thinking', 'text': 'Đang tìm kiếm thông tin...\n'}
 
             retrieved_context = await self.context_retriever.user_retrieve_context(
@@ -301,14 +306,14 @@ class ChatService:
                 session_id=user_id,
                 user_context=user_context.model_dump(),
             )
-            
+
             yield {'_type': 'thinking', 'text': 'Hoàn thành tìm kiếm thông tin!\n'}
 
             inal_messages = self.prompt_formatter.format_chat_prompt(
-                processed_info=processed_info, 
+                processed_info=processed_info,
                 retrieved_context=retrieved_context
             )
-            
+
             yield {'_type': 'header_thinking', 'text': 'Đang phản hồi yêu cầu...\n'}
 
             response_text = ""
@@ -316,9 +321,9 @@ class ChatService:
             with self.instrumentor.observe(session_id=session_id, user_id=user_id, trace_name=trace_name):
                 response_text = await self.main_llm.arun(messages=inal_messages)
             self.instrumentor.flush()
-            
+
             yield {'_type': 'header_thinking', 'text': 'Đang phân tích phản hổi...\n'}
-            
+
             from services import (
                 get_google_genai_llm,
                 get_settings_cached
@@ -334,6 +339,7 @@ class ChatService:
             )
             response_text = response_permission_editor_response.get("answer")
 
+            chat_id = str(uuid4())
             chat_to_store = BaseChat(
                 message=query_text,
                 response=response_text,
@@ -341,10 +347,10 @@ class ChatService:
                     "source_document_ids": [id_ for id_, _ in retrieved_context.source_documents.items()]
                 },
                 timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                chat_id=str(uuid4())
+                chat_id=chat_id
             )
-            
-            _ = await self._run_sync_in_thread(
+
+            session_title = await self._run_sync_in_thread(
                 lambda: self.memory_store.add_chat(
                     user_id=user_id,
                     session_id=session_id,
@@ -353,7 +359,11 @@ class ChatService:
                 )
             )
 
-            yield {'_type': 'response', 'text': response_text} 
+            yield {'_type': 'response', 'text': response_text}
+
+            if session_title:
+                yield {'_type': 'session_title', 'text': session_title}
+            yield {'_type': 'chat_id', 'text': chat_id}
 
         except HTTPException as http_exc:
             raise http_exc

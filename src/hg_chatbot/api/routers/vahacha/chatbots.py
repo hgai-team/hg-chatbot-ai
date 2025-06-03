@@ -42,6 +42,8 @@ async def store_chat(
     from datetime import datetime
     from core.storages import BaseChat
     from uuid import uuid4
+
+    chat_id = str(uuid4())
     chat_to_store = BaseChat(
         message=query_text,
         response=response_text,
@@ -49,9 +51,20 @@ async def store_chat(
             "source_document_ids": source_document_ids
         },
         timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        chat_id=str(uuid4())
+        chat_id=chat_id
     )
-    _ = await obj._run_sync_in_thread(obj.memory_store.add_chat, user_id, session_id, chat_to_store)
+
+    from services import get_google_genai_llm
+    session_title = await obj._run_sync_in_thread(
+        lambda: obj.memory_store.add_chat(
+            user_id=user_id,
+            session_id=session_id,
+            chat=chat_to_store,
+            llm=get_google_genai_llm(model_name="models/gemini-2.0-flash")
+        )
+    )
+
+    return session_title, chat_id
 
 @app.get(
     "/vahacha/get-vh-info",
@@ -151,7 +164,7 @@ async def chat_admin_stream(
 
 @app.post(
     "/vahacha/agentic-workflow/user",
-    response_model=ChatResponse,
+    # response_model=ChatResponse,
     dependencies=[Depends(validate_auth)]
 )
 async def chat_user(
@@ -235,6 +248,7 @@ async def chat_user(
             session_id=request.session_id,
             user_context=request.user_context
         )
+
         end_time = timeit.default_timer()
         return ChatResponse(results=response_text, status=200, time_taken=end_time - start_time)
 
@@ -291,13 +305,16 @@ async def chat_user_stream(
         if validate_response.get("status") == "invalid":
             yield await yield_data('response', f"""{validate_response.get("response", "Invalid query.")}\n""")
             yield await yield_data('end', 'Hoàn thành!\n')
-            await store_chat(
+            session_title, chat_id = await store_chat(
                 obj=chat_service,
                 user_id=request.user_id,
                 session_id=request.session_id,
                 query_text=request.query_text.lower(),
                 response_text=validate_response.get("response", "Invalid query.")
             )
+            if session_title:
+                yield await yield_data('session_title', session_title)
+            yield await yield_data('chat_id', chat_id)
             return
 
         yield await yield_data('thinking', f"""{agent_thinking_data.get("safety_guards")[random.randint(0, len(agent_thinking_data.get("safety_guards")) - 1)]}\n""")
@@ -314,13 +331,16 @@ async def chat_user_stream(
 
             yield await yield_data('response', response_text.get("answer"))
             yield await yield_data('end', 'Hoàn thành!\n')
-            await store_chat(
+            session_title, chat_id = await store_chat(
                 obj=chat_service,
                 user_id=request.user_id,
                 session_id=request.session_id,
                 query_text=request.query_text.lower(),
                 response_text=response_text.get("answer")
             )
+            if session_title:
+                yield await yield_data('session_title', session_title)
+            yield await yield_data('chat_id', chat_id)
             return
 
         if validate_response.get("chatbot_information"):
@@ -329,13 +349,16 @@ async def chat_user_stream(
             for text in agent_thinking_data['chatbot_information']:
                 yield await yield_data('response', text)
             yield await yield_data('end', 'Hoàn thành!\n')
-            await store_chat(
+            session_title, chat_id = await store_chat(
                 obj=chat_service,
                 user_id=request.user_id,
                 session_id=request.session_id,
                 query_text=request.query_text.lower(),
                 response_text="\n".join(agent_thinking_data['chatbot_information'])
             )
+            if session_title:
+                yield await yield_data('session_title', session_title)
+            yield await yield_data('chat_id', chat_id)
             return
 
         async for data in chat_service.user_process_chat_request_stream(

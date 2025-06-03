@@ -11,14 +11,16 @@ class BaseChat:
         chat_id: str,
         context: Optional[Dict[str, Any]] = None,
         timestamp: Optional[datetime] = None,
-        rating: Optional[str] = None
+        rating_type: Optional[str] = None,
+        rating_text: Optional[str] = None
     ):
         self.message = message
         self.response = response
         self.context = context or {}
         self.timestamp = timestamp or datetime.now()
         self.chat_id = chat_id
-        self.rating = rating
+        self.rating_type = rating_type
+        self.rating_text = rating_text
 
 class ChatHistory:
     """Represents a single chat message"""

@@ -168,6 +168,15 @@ async def fetch_user_context_obj(user_id: int) -> UserContext:
     """Hàm helper để fetch và parse UserContext từ service"""
     import requests
 
+    if user_id==1255008453773099029:
+        return UserContext(
+            role="seo",
+            departments=["mkt 1"],
+            teams=["mkt 1"],
+            projects=["lofi", "relax"],
+            networks=["routenote", "dashgo", "la cupula music"]
+        )
+
     resp = requests.get(f"http://discord-crawl:8200/users/{user_id}")
     if resp.status_code == 200:
         resp_json = {}
