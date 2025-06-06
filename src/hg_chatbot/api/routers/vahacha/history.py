@@ -55,9 +55,9 @@ async def get_session_history(
 )
 async def add_rating(
     chat_id: str,
-    rating_type: str,
-    rating_text: str,
     bot_name: BotNames,
+    rating_type: str = None,
+    rating_text: str = None,
 ):
 
     memory_store = get_mongodb_memory_store(
@@ -72,7 +72,8 @@ async def add_rating(
             rating_text=rating_text
         )
         return {
-            "status": 200
+            "rating_type": rating_type,
+            "rating_text": rating_text
         }
     except Exception as e:
         raise HTTPException(

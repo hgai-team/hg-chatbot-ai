@@ -3,15 +3,16 @@ from typing import List, Optional, Union
 
 from core.base import Document
 from .base import BaseDocumentStore
+from core.config import get_core_settings
 
 class MongoDBDocumentStore(BaseDocumentStore):
     """MongoDB document store which supports full-text search queries"""
 
     def __init__(
         self,
-        connection_string: str,
-        database_name: str,
-        collection_name: str,
+        connection_string: Optional[str] = None,
+        database_name: Optional[str] = None,
+        collection_name: Optional[str] = None,
         **kwargs,
     ):
         try:
@@ -27,9 +28,9 @@ class MongoDBDocumentStore(BaseDocumentStore):
         self.database_name = database_name
         self.collection_name = collection_name
 
-        self.client: MongoClient = MongoClient(connection_string)
-        self.db: Database = self.client[database_name]
-        self.collection: Collection = self.db[collection_name]
+        self.client = MongoClient(connection_string if connection_string else get_core_settings().MONGODB_CONNECTION_STRING)
+        self.db: Database = self.client[database_name if database_name else get_core_settings().MONGODB_BASE_DATABASE_NAME]
+        self.collection: Collection = self.db[collection_name if collection_name else get_core_settings().MONGODB_BASE_DOC_COLLECTION_NAME]
 
         _ = self.create_index()
 

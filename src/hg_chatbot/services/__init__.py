@@ -17,7 +17,8 @@ from core.loaders import (
 from langfuse.llama_index import LlamaIndexInstrumentor
 from qdrant_client import QdrantClient
 
-
+mongo_db_mem = MongoDBMemoryStore()
+mongo_db_doc = MongoDBDocumentStore()
 
 @lru_cache
 def get_settings_cached():
@@ -59,14 +60,10 @@ def get_qdrant_vector_store(
     return QdrantVectorStore(collection_name=collection_name, client=qdrant_client)
 
 def get_mongodb_memory_store(
-    connection_string: str = None,
     database_name: str = None,
     collection_name: str = None,
 ):
     settings = get_settings_cached()
-
-    if connection_string is None:
-        connection_string = settings.MONGODB_CONNECTION_STRING
 
     if database_name is None:
         database_name = settings.MONGODB_BASE_DATABASE_NAME
@@ -78,21 +75,16 @@ def get_mongodb_memory_store(
     elif not collection_name.endswith(settings.MONGODB_BASE_CHAT_HISTORY_COLLECTION_NAME):
         collection_name = f"{collection_name}{settings.MONGODB_BASE_CHAT_HISTORY_COLLECTION_NAME}"
 
-    return MongoDBMemoryStore(
-        connection_string=connection_string,
-        database_name=database_name,
-        collection_name=collection_name,
-    )
+    mongo_db_mem.db = mongo_db_mem.client[database_name]
+    mongo_db_mem.collection = mongo_db_mem.db[collection_name]
+
+    return mongo_db_mem
 
 def get_mongodb_doc_store(
-    connection_string: str = None,
     database_name: str = None,
     collection_name: str = None,
 ):
     settings = get_settings_cached()
-
-    if connection_string is None:
-        connection_string = settings.MONGODB_CONNECTION_STRING
 
     if database_name is None:
         database_name = settings.MONGODB_BASE_DATABASE_NAME
@@ -104,11 +96,10 @@ def get_mongodb_doc_store(
     elif not collection_name.endswith(settings.MONGODB_BASE_DOC_COLLECTION_NAME):
         collection_name = f"{collection_name}{settings.MONGODB_BASE_DOC_COLLECTION_NAME}"
 
-    return MongoDBDocumentStore(
-        connection_string=connection_string,
-        database_name=database_name,
-        collection_name=collection_name,
-    )
+    mongo_db_doc.db = mongo_db_doc.client[database_name]
+    mongo_db_doc.collection = mongo_db_doc.db[collection_name]
+
+    return mongo_db_doc
 
 def get_openai_llm(
     api_key: str = None,
