@@ -2,8 +2,6 @@ from fastapi import (
     APIRouter,
     HTTPException,
     Depends,
-    Path,
-    Form
 )
 
 from api.schema import BotNames
@@ -80,31 +78,3 @@ async def add_rating(
             status_code=500,
             detail=str(e)
         )
-
-# @app.get(
-#     "/sessions",
-#     dependencies=[Depends(validate_auth)],
-# )
-# async def get_user_sessions(
-#     user_id: str,
-#     bot_name: BotNames,
-# ):
-
-#     memory_store = get_mongodb_memory_store(
-#         database_name=bot_name,
-#         collection_name=bot_name,
-#     )
-
-#     try:
-#         history = memory_store.get_user_sessions(
-#             user_id=user_id
-#         )
-#         return {
-#             'results': history
-#         }
-#     except Exception as e:
-#         raise HTTPException(
-#             status_code=500,
-#             detail=str(e)
-#         )
-

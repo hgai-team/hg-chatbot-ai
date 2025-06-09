@@ -178,6 +178,41 @@ class FileProcessorTool:
         _ = await asyncio.gather(*tasks)
 
         return {"status": 200}
+    
+    async def upload_and_convert_pdf_to_md(
+        self,
+        file: UploadFile,
+    ):
+        from services import (
+            get_google_genai_llm,
+            get_settings_cached
+        )
+        google_llm = get_google_genai_llm(
+            model_name=get_settings_cached().GOOGLEAI_MODEL_THINKING
+        ) 
+        # file_name, file_stream = await parse_file(file)
+
+        # await self._save_file(
+        #     file_stream=file_stream,
+        #     file_name=file_name,
+        #     save_directory=DEFAULT_SAVE_PATH
+        # )
+
+        # file_stream.seek(0)
+
+        # docs = self.pymupdf_reader.load_data(
+        #     file=file_stream,
+        #     extra_info={"file_name": file_name}
+        # )
+
+        # tasks = [
+        #     asyncio.create_task(self.store_docs(docs)),
+        #     asyncio.create_task(self.embed_and_index_documents(docs)),
+        # ]
+
+        # _ = await asyncio.gather(*tasks)
+
+        # return {"status": 200}
 
     async def upload_docx_file(
         self,

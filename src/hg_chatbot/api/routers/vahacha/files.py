@@ -19,23 +19,8 @@ app = APIRouter(
     tags=["Files"]
 )
 
-# @app.get(
-#     "/{file_name}",
-#     dependencies=[Depends(validate_auth)],
-#     response_model=FilesResponse
-# )
-# async def get_file_info(file_name: str = Path(...)):
-#     try:
-#         pass
-#         # return FilesResponse(**response)
-#     except Exception as e:
-#         raise HTTPException(
-#             status_code=500,
-#             detail=str(e)
-#         )
-
 @app.delete(
-    "/{file_name}",
+    "/vahacha/{file_name}",
     dependencies=[Depends(validate_auth)],
     response_model=FilesResponse
 )
@@ -58,7 +43,7 @@ async def delete_file(
         )
 
 @app.post(
-    "/excel",
+    "/vahacha/excel",
     dependencies=[Depends(validate_auth)],
     response_model=FilesResponse
 )
@@ -92,7 +77,7 @@ async def upload_excel_file(
 
 
 @app.post(
-    "/pdf",
+    "/vahacha/pdf",
     dependencies=[Depends(validate_auth)],
     response_model=FilesResponse
 )
@@ -122,7 +107,7 @@ async def upload_pdf_file(
         )
 
 @app.post(
-    "/docx",
+    "/vahacha/docx",
     dependencies=[Depends(validate_auth)],
     response_model=FilesResponse
 )

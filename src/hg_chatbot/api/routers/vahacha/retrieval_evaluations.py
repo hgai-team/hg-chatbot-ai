@@ -22,7 +22,7 @@ from services.tools import (
 )
 
 @app.post(
-    "/vector",
+    "/vahacha/vector",
     dependencies=[Depends(validate_auth)]
 )
 async def retrieval_vector(
@@ -50,7 +50,7 @@ async def retrieval_vector(
         )
 
 @app.post(
-    "/keywords",
+    "/vahacha/keywords",
     dependencies=[Depends(validate_auth)]
 )
 async def retrieval_keywords(

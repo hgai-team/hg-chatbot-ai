@@ -30,7 +30,7 @@ app = APIRouter(
 )
 
 @app.post(
-    "/create",
+    "/vahacha/create",
     dependencies=[Depends(validate_auth)]
 )
 async def create_data(
@@ -49,7 +49,7 @@ async def create_data(
     return {'status': 200}
 
 @app.post(
-    "/get-all",
+    "/vahacha/get-all",
     dependencies=[Depends(validate_auth)]
 )
 async def get_all_data():
@@ -63,7 +63,7 @@ async def get_all_data():
     }
 
 @app.post(
-    "/get-all/{type}",
+    "/vahacha/get-all/{type}",
     dependencies=[Depends(validate_auth)]
 )
 async def get_all_type_data(
@@ -79,7 +79,7 @@ async def get_all_type_data(
     }
 
 @app.post(
-    "/update",
+    "/vahacha/update",
     dependencies=[Depends(validate_auth)]
 )
 async def update_data(
@@ -101,7 +101,7 @@ async def update_data(
     }
 
 @app.delete(
-    "/delete",
+    "/vahacha/delete",
     dependencies=[Depends(validate_auth)]
 )
 async def delete_data(
@@ -118,24 +118,7 @@ async def delete_data(
     }
 
 @app.delete(
-    "/delete",
-    dependencies=[Depends(validate_auth)]
-)
-async def delete_data(
-    id_: str
-):
-    with get_session() as session:
-        session.exec(
-            delete(vahacha_InfoPermission).where(vahacha_InfoPermission.id_==id_)
-        )
-        session.commit()
-
-    return {
-        'status': 200
-    }
-
-@app.delete(
-    "/delete-all",
+    "/vahacha/delete-all",
     dependencies=[Depends(validate_auth)]
 )
 async def delete_all_data():

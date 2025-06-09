@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 
 from api.schema import ChatRequest, ChatResponse, BotNames
 from api.security import validate_auth
-from api.routers.vahacha.tokenizer import tiktokenize
+from api.routers.tokenizer import tiktokenize
 
 from services import get_settings_cached
 from services.agentic_workflow.vahacha.chat import ChatService

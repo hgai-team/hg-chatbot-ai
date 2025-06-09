@@ -13,7 +13,7 @@ app = APIRouter(
 )
 
 @app.post(
-    "/safety_guard",
+    "/vahacha/safety_guard",
     dependencies=[Depends(validate_auth)]
 )
 async def safety_guard(
@@ -53,7 +53,7 @@ async def safety_guard(
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
 @app.post(
-    "/query_classifier",
+    "/vahacha/query_classifier",
     dependencies=[Depends(validate_auth)]
 )
 async def query_classifier(
@@ -93,7 +93,7 @@ async def query_classifier(
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
 @app.post(
-    "/query_preprocessor",
+    "/vahacha/query_preprocessor",
     dependencies=[Depends(validate_auth)]
 )
 async def query_preprocessor(
@@ -135,7 +135,7 @@ async def query_preprocessor(
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
 @app.post(
-    "/keyword_extractor",
+    "/vahacha/keyword_extractor",
     dependencies=[Depends(validate_auth)]
 )
 async def keyword_extractor(
@@ -177,7 +177,7 @@ async def keyword_extractor(
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
 @app.post(
-    "/response_permission_editor",
+    "/vahacha/response_permission_editor",
     dependencies=[Depends(validate_auth)]
 )
 async def response_permission_editor(
