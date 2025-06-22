@@ -1,13 +1,3 @@
-# FROM python:3.10.16-slim
-
-# USER root
-
-# WORKDIR /app
-
-# COPY requirements.txt .
-
-# RUN pip install -r requirements.txt
-
 # --- Builder stage: cài tất cả dependencies vào /install ---
 FROM python:3.10.16-slim AS builder
 WORKDIR /app
@@ -15,7 +5,7 @@ WORKDIR /app
 # Cài build tools chỉ cho giai đoạn builder
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      build-essential gcc libssl-dev libffi-dev \
+      build-essential gcc libssl-dev libffi-dev libpq-dev python3-dev libpq5 \
  && rm -rf /var/lib/apt/lists/*
 
 # Copy file requirements và cài với --prefix để có cả /install/bin và /install/lib

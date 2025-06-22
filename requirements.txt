@@ -13,11 +13,14 @@ qdrant_client
 lancedb
 tantivy
 pymongo
+motor
 discord
 openpyxl
 pymupdf
 aiofiles
 python-docx
+asyncpg
+psycopg2-binary
 
 fastapi
 uvicorn
@@ -26,5 +29,5 @@ pydantic_settings
 sqlmodel
 alembic
 
-PyJWT 
+PyJWT
 cryptography

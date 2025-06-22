@@ -1,19 +1,24 @@
 services:
   hg-chatbot:
     image: krntl/hgcb:latest
+    container_name: dev-hg-chatbot
+    env_file:
+      - .env
     ports:
       - 28888:28888
     volumes:
-      - "./src/hg_chatbot:/app"
+      - "./app:/app"
     networks:
       - hg-chatbot-network
     command: uvicorn main:app --host 0.0.0.0 --port 28888 --reload
     depends_on:
       - mongodb-hg-chatbot
       - qdrant-hg-chatbot
+      - postgres-hg-chatbot
 
   mongodb-hg-chatbot:
     image: mongodb/mongodb-community-server:7.0.11-ubuntu2204
+    container_name: dev-mongodb-hg-chatbot
     ports:
       - "27017:27017"
     environment:
@@ -34,6 +39,7 @@ services:
 
   qdrant-hg-chatbot:
     image: qdrant/qdrant:v1.14.1
+    container_name: dev-qdrant-hg-chatbot
     ports:
       - 6333:6333
       - 6334:6334
@@ -50,6 +56,33 @@ services:
             memory: 512M
             cpus: '1.25'
 
+  postgres-hg-chatbot:
+    image: postgres:15
+    container_name: dev-postgres-hg-chatbot
+    ports:
+      - '5432:5432'
+    restart: always
+
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+
+    volumes:
+      - dev_ai_hgcb_postgres_data:/var/lib/postgresql/data
+
+    networks:
+      - hg-chatbot-network
+
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '5.0'
+        reservations:
+          memory: 256M
+          cpus: '2.0'
+
 networks:
   hg-chatbot-network:
     external: true
@@ -58,4 +91,6 @@ volumes:
   dev_ai_hgcb_qdrant_data:
     external: true
   dev_ai_hgcb_mongodb_data:
+    external: true
+  dev_ai_hgcb_postgres_data:
     external: true

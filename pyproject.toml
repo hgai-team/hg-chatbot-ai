@@ -1,23 +1,47 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "hg_chatbot"
 version = "0.1.0"
-description = "hg-chatbot using crewAI"
-authors = [{ name = "Your Name", email = "you@example.com" }]
+description = "hg-chatbot"
+authors = [{ name = "HG AI Team", email = "longnt@hgmedia.vn" }]
 requires-python = ">=3.10,<3.13"
 dependencies = [
-    "crewai[tools]>=0.105.0,<1.0.0"
+    "llama-index==0.12.37",
+    "llama-index-agent-openai==0.4.8",
+    "llama-index-llms-openai==0.3.42",
+    "llama-index-llms-google-genai==0.1.13",
+    "llama-index-callbacks-langfuse==0.3.0",
+    "llama-index-vector-stores-qdrant==0.6.0",
+    "llama-index-llms-langchain==0.6.1",
+
+    "langfuse==2.60.5",
+    "qdrant_client==1.14.2",
+    "lancedb==0.22.0",
+    "tantivy==0.24.0",
+    "pymongo==4.13.0",
+    "discord==2.3.2",
+    "openpyxl==3.1.5",
+    "PyMuPDF==1.25.5",
+    "aiofiles==24.1.0",
+    "python-docx==1.1.2",
+    "motor",
+    "asyncpg",
+    "psycopg2-binary",
+
+    "fastapi==0.115.12",
+    "uvicorn==0.34.2",
+    "python-multipart==0.0.20",
+    "pydantic-settings==2.9.1",
+    "sqlmodel==0.0.24",
+    "alembic==1.16.1",
+    "psycopg2-binary",
+
+    "PyJWT==2.10.1",
+    "cryptography==45.0.3",
 ]
 
-[project.scripts]
-hg_chatbot = "hg_chatbot.main:run"
-run_crew = "hg_chatbot.main:run"
-train = "hg_chatbot.main:train"
-replay = "hg_chatbot.main:replay"
-test = "hg_chatbot.main:test"
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.crewai]
-type = "crew"
+[tool.setuptools.packages.find]
+where = ["."]

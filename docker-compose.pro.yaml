@@ -1,56 +1,99 @@
 services:
   hg-chatbot:
     image: krntl/hgcb:latest
+    container_name: pro-hg-chatbot
+
+    restart: always
+
+    env_file:
+      - .env
     ports:
       - 18888:18888
     volumes:
-      - "./src/hg_chatbot:/app"
+      - "./app:/app"
     networks:
       - pro-hg-chatbot-network
     command: uvicorn main:app --host 0.0.0.0 --port 18888
     depends_on:
       - mongodb-hg-chatbot
       - qdrant-hg-chatbot
+      - postgres-hg-chatbot
 
   mongodb-hg-chatbot:
     image: mongodb/mongodb-community-server:7.0.11-ubuntu2204
+    container_name: pro-mongodb-hg-chatbot
+
+    restart: always
+
     environment:
       - MONGODB_INITDB_ROOT_USERNAME=$(MONGODB_INITDB_ROOT_USERNAME)
       - MONGODB_INITDB_ROOT_PASSWORD=$(MONGODB_INITDB_ROOT_PASSWORD)
     volumes:
-      - docker_mongodb_data:/data/db
+      - pro_ai_hgcb_mongodb_data:/data/db
     networks:
       - pro-hg-chatbot-network
     deploy:
       resources:
         limits:
-          memory: 1.5G
-          cpus: '1.25'
+          memory: 2G
+          cpus: '4.0'
         reservations:
           memory: 512M
-          cpus: '0.25'
+          cpus: '1.25'
 
   qdrant-hg-chatbot:
     image: qdrant/qdrant:v1.14.1
+    container_name: pro-qdrant-hg-chatbot
+
+    restart: always
+
     volumes:
-      - docker_qdrant_data:/qdrant/storage
+      - pro_ai_hgcb_qdrant_data:/qdrant/storage
     networks:
       - pro-hg-chatbot-network
     deploy:
         resources:
           limits:
-            memory: 1.5G
-            cpus: '1.25'
+            memory: 2G
+            cpus: '4.0'
           reservations:
             memory: 512M
-            cpus: '0.5'
+            cpus: '1.25'
+
+  postgres-hg-chatbot:
+    image: postgres:15
+    container_name: dev-postgres-hg-chatbot
+
+    restart: always
+
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+
+    volumes:
+      - pro_ai_hgcb_postgres_data:/var/lib/postgresql/data
+
+    networks:
+      - pro-hg-chatbot-network
+
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '3.0'
+        reservations:
+          memory: 256M
+          cpus: '1.0'
 
 networks:
   pro-hg-chatbot-network:
     external: true
 
 volumes:
-  docker_qdrant_data:
+  pro_ai_hgcb_qdrant_data:
     external: true
-  docker_mongodb_data:
+  pro_ai_hgcb_mongodb_data:
+    external: true
+  pro_ai_hgcb_postgres_data:
     external: true
