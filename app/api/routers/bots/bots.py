@@ -418,6 +418,40 @@ async def get_logs(
             detail="Internal server error"
         )
 
+@app.get(
+    "/{bot_name}/logs/file",
+    dependencies=[Depends(validate_auth)],
+    tags=['Logs'],
+)
+async def get_logs_file(
+    bot_name: str = Path(...),
+):
+    bot_manager: BaseManager = get_bot_manager(bot_name)
+
+    try:
+        file, ts = await bot_manager.get_logs_file()
+
+        filename = f"{bot_name}_logs_{ts}.xlsx"
+        headers = {"Content-Disposition": f'attachment; filename=\"{filename}\"'}
+        return StreamingResponse(
+            file,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers=headers
+        )
+
+    except AttributeError as e:
+        logger.error(f"Attribute error in get_logs_file for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=f"Bot '{bot_name}' does not support get_logs_file feature"
+        )
+    except Exception as e:
+        logger.error(f"An error occurred in get_logs_file for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
 # Agent API Endpoints
 @app.post(
     "/{bot_name}/agents/eval",

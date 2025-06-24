@@ -1,3 +1,6 @@
+import io
+import pandas as pd
+
 from fastapi import UploadFile, HTTPException, status
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -86,7 +89,7 @@ class OpsBotManager(BaseManager):
             ops_bot_service=self.ops_bot,
         )
         return response
-    
+
     async def delete_file(
         self,
         file_name: str
@@ -180,6 +183,53 @@ class OpsBotManager(BaseManager):
                 )
 
             return results[(page_index - 1) * limit: page_index * limit], {'page_number': page_number, 'total_items': len(results)}
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error processing logs: {str(e)}"
+            )
+
+    async def get_logs_file(
+        self,
+    ):
+        results = []
+        logs = await self.ops_bot.memory_store.get_logs()
+        try:
+            if len(logs) == 0:
+                return [], {'page_number': 0, 'total_items': 0}
+
+
+            for log in logs:
+                for history in log.history:
+                    ts_bkk_naive = (
+                        history["timestamp"]
+                        .replace(tzinfo=timezone.utc)
+                        .astimezone(ZoneInfo("Asia/Bangkok"))
+                        .replace(tzinfo=None)
+                    )
+
+                    results.append({
+                        "user_id": log.user_id,
+                        "session_id": log.session_id,
+                        "message": history["message"],
+                        "response": history["response"],
+                        "timestamp": ts_bkk_naive,
+                        "chat_id": history["chat_id"],
+                        "rating_type": history["rating_type"],
+                        "rating_text": history["rating_text"]
+                    })
+
+            df = pd.DataFrame(results)
+
+            file = io.BytesIO()
+            with pd.ExcelWriter(file, engine='openpyxl') as writer:
+                ts = datetime.now(ZoneInfo("Asia/Bangkok")).strftime("%Y%m%d_%H%M")
+                sheet_name = f"history_{ts}"[:31]
+                df.to_excel(writer, index=False, sheet_name=sheet_name)
+            file.seek(0)
+
+            return file, ts
 
         except Exception as e:
             raise HTTPException(
