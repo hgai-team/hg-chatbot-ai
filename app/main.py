@@ -21,7 +21,7 @@ logger = logging.getLogger("main")
 async def lifespan(app: FastAPI):
     await create_db_and_tables()
     setup_logging()
-    
+
     if get_api_settings().ENV == 'pro':
         from core.discord.bot import message_queue, workers, thread_pool
 
@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
     yield
 
     if get_api_settings().ENV == 'pro':
-    
+
         logger.info("Shutting down Discord bot...")
         if client.is_ready():
             await client.close()
@@ -69,6 +69,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["content-disposition"]
 )
 
 def main():

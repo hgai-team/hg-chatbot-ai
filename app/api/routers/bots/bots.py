@@ -280,6 +280,43 @@ async def upload_excel(
             detail="Internal server error"
         )
 
+@app.post(
+    "/{bot_name}/files/pdf-to-md",
+    dependencies=[Depends(validate_auth)],
+    response_model=FileResponse,
+    tags=['Files']
+)
+async def upload_pdf_to_md(
+    bot_name: str = Path(...),
+    file: UploadFile = File(...),
+    use_type: bool = Literal[True, False],
+    use_pandas: bool = Literal[False, True]
+):
+    if not file.filename.endswith((".pdf")):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file format. Please upload an PDF file."
+        )
+
+    bot_manager: BaseManager = get_bot_manager(bot_name)
+    try:
+        response = await bot_manager.upload_pdf_to_md(
+            file=file,
+        )
+        return FileResponse(**response)
+    except AttributeError as e:
+        logger.error(f"Attribute error in upload_pdf_to_md for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=f"Bot '{bot_name}' does not support upload_pdf_to_md feature"
+        )
+    except Exception as e:
+        logger.error(f"An unhandled error occurred in upload_pdf_to_md for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
 # Session API Endpoints
 @app.get(
     "/{bot_name}/sessions",
