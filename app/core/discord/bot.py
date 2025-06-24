@@ -11,12 +11,15 @@ from fastapi import Depends
 from starlette.responses import StreamingResponse
 
 # import endpoint và schema từ FastAPI
-from api.routers.bots.ops_bot.handlers.chat import ops_chat_user_stream, ops_chat_stream
-from api.schema import ChatRequest, UserContext
+from app.api.routers.bots.ops_bot.handlers.chat import ops_chat_user_stream, ops_chat_stream
+from app.api.routers.bots.bots import chat_user_stream, chat_stream
+from app.api.schema import ChatRequest, UserContext
 
-from api.config import get_api_settings
-from core.config import get_core_settings
-from core.base import Document
+
+
+from app.api.config import get_api_settings
+from app.core.config import get_core_settings
+from app.core.base import Document
 
 from llama_index.core.node_parser import SentenceSplitter
 
@@ -82,22 +85,23 @@ async def process_single_message(message: discord.Message, prompt: str):
         user_context = await fetch_user_context_obj(message.author.id)
 
         # Chuẩn bị ChatRequest
-        chat_req = ChatRequest(
-            bot_name='VaHaCha',
+        chat_request = ChatRequest(
             user_id=str(message.author.id),
             session_id=f"discord-{message.author.id}",
             query_text=prompt,
-            user_context=user_context
         )
 
         # Gọi FastAPI endpoint
         if user_context.role != 'admin':
-            streaming_resp: StreamingResponse = await ops_chat_user_stream(
-                request=chat_req,
+            streaming_resp: StreamingResponse = await chat_user_stream(
+                chat_request=chat_request,
+                user_context=user_context,
+                bot_name='VaHaCha'
             )
         else:
-            streaming_resp: StreamingResponse = await ops_chat_stream(
-                request=chat_req,
+            streaming_resp: StreamingResponse = await chat_stream(
+                chat_request=chat_request,
+                bot_name='VaHaCha'
             )
 
         # Đọc từng SSE chunk từ body_iterator
