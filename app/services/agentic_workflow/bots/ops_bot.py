@@ -133,7 +133,7 @@ class OpsBotService(BaseBotService):
                     chat=chat_to_store,
                     llm=get_google_genai_llm(model_name="models/gemini-2.0-flash")
                 )
-                
+
             except Exception as e:
                 logger.error(f"Failed to store chat history for session '{session_id}': {e}", exc_info=True)
                 session_title = "New Chat"
@@ -212,7 +212,7 @@ class OpsBotService(BaseBotService):
                     chat=chat_to_store,
                     llm=get_google_genai_llm(model_name="models/gemini-2.0-flash")
                 )
-                
+
             except Exception as e:
                 logger.error(f"Failed to store chat history for session '{session_id}': {e}", exc_info=True)
                 session_title = "New Chat"
@@ -278,7 +278,7 @@ class OpsBotService(BaseBotService):
             except:
                 logger.error(f"Error during query analysis for session '{session_id}': {e}", exc_info=True)
                 raise HTTPException(status_code=500, detail="Error during query analysis")
-            
+
             try:
                 retrieved_context = await self.context_retriever.user_retrieve_context(
                     processed_query_info=processed_info,

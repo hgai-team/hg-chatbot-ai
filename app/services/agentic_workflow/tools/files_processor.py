@@ -5,6 +5,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from pathlib import Path
+from typing import Callable
 
 from fastapi import HTTPException, UploadFile
 
@@ -12,7 +13,8 @@ from core.loaders import (
     ExcelReader,
     PandasExcelReader,
     PyMuPDFReader,
-    DocxReader
+    DocxReader,
+    MarkdownReader
 )
 
 from core.storages import (
@@ -21,9 +23,11 @@ from core.storages import (
 )
 
 from core.embeddings import OpenAIEmbedding
+from services.agentic_workflow.tools.prompt_processor import PromptProcessorTool
 
 from core.loaders.utils import get_visible_sheets
-from core.parsers import parse_file
+from core.parsers import parse_file, json_parser
+from services import get_settings_cached
 
 DEFAULT_SAVE_PATH = Path("./data")
 CONCURRENT_LIMIT = 7
@@ -31,25 +35,114 @@ CONCURRENT_LIMIT = 7
 class FileProcessorTool:
     def __init__(
         self,
-        excel_reader = ExcelReader,
-        pandas_excel_reader = PandasExcelReader,
-        pymupdf_reader = PyMuPDFReader,
-        docx_reader = DocxReader,
-
-        openai_embedding = OpenAIEmbedding,
-
-        mongodb_doc_store = MongoDBDocumentStore,
-        qdrant_vector_store = QdrantVectorStore,
+        bot_name: str
     ):
-        self.excel_reader = excel_reader
-        self.pandas_excel_reader = pandas_excel_reader
-        self.pymupdf_reader = pymupdf_reader
-        self.docx_reader = docx_reader
+        self.bot_name = bot_name
+        self._set_up()
 
-        self.openai_embedding = openai_embedding
+    def _set_up(
+        self
+    ):
+        from services import (
+            get_excel_reader_cached,
+            get_pandas_excel_reader_cached,
+            get_pymupdf_reader_cached,
+            get_docx_reader_cached,
+            get_markdown_reader_cached,
 
-        self.mongodb_doc_store: MongoDBDocumentStore = mongodb_doc_store
-        self.qdrant_vector_store = qdrant_vector_store
+            get_openai_embedding_cached,
+            get_mongodb_doc_store,
+            get_qdrant_vector_store
+        )
+
+        self.excel_reader: ExcelReader = get_excel_reader_cached()
+        self.pandas_excel_reader: PandasExcelReader  = get_pandas_excel_reader_cached()
+        self.pymupdf_reader: PyMuPDFReader = get_pymupdf_reader_cached()
+        self.docx_reader: DocxReader = get_docx_reader_cached()
+        self.md_reader: MarkdownReader = get_markdown_reader_cached()
+
+        self.openai_embedding: OpenAIEmbedding = get_openai_embedding_cached()
+
+        self.mongodb_doc_store: MongoDBDocumentStore = get_mongodb_doc_store(
+            database_name=self.bot_name,
+            collection_name=self.bot_name,
+        )
+        self.qdrant_vector_store: QdrantVectorStore = get_qdrant_vector_store(
+            collection_name=self.bot_name,
+        )
+
+    async def chat(
+        self,
+        input_: str,
+        model: Callable,
+        agent_prompt_path: str,
+        agent_name: str,
+        func_name: str
+    ):
+        agent_config = PromptProcessorTool.load_prompt(agent_prompt_path)[agent_name]
+        prompt_template = PromptProcessorTool.load_prompt(get_settings_cached().BASE_PROMPT_PATH)
+
+        for cnt in range(1, 5):
+            try:
+                if cnt > 0:
+                    logger.info(f"Retry {func_name}: {cnt}")
+
+                prompt = PromptProcessorTool.apply_chat_template(
+                    template=prompt_template,
+                    **{**agent_config, **{"input": input_}}
+                )
+                messages = PromptProcessorTool.prepare_chat_messages(prompt=prompt)
+                response = await model.arun(messages)
+                json_response = json_parser(response)
+
+                return json_response
+            except Exception as e:
+                logger.error(f"An unhandled error occurred in {func_name}: {e}", exc_info=True)
+                continue
+
+        return None
+
+    async def ocr_to_md(
+        self,
+        file_path: str,
+        agent_name: str
+    ):
+        from google import genai
+        from google.genai import types
+
+
+        client = genai.Client(api_key=get_settings_cached().GOOGLEAI_API_KEY)
+        myfile = client.files.upload(file=file_path)
+
+        prompts = PromptProcessorTool.load_prompt(get_settings_cached().BASE_PROMPT_PATH)
+        agent = prompts[agent_name]
+        system_prompt = (
+            f"{agent['role']}"
+            f"{agent['description']}"
+            f"{agent['instructions']}"
+        )
+
+        for cnt in range(1, 5):
+            try:
+                if cnt > 0:
+                    logger.info(f"Retry ocr_to_md: {cnt}")
+
+                response = await asyncio.to_thread(
+                    client.models.generate_content,
+                    model=get_settings_cached().GOOGLEAI_MODEL_THINKING,
+                    contents=[system_prompt, myfile],
+                    config=types.GenerateContentConfig(
+                        max_output_tokens=128000,
+                    )
+                )
+
+                return response.text
+            except Exception as e:
+                logger.error(f"An unhandled error occurred in ocr_to_md: {e}", exc_info=True)
+                continue
+
+        return None
+
 
     async def ops_bot_get_context_data(
         self
@@ -58,7 +151,7 @@ class FileProcessorTool:
 
         context_data = {}
         response = await get_all_master_data()
-        
+
         for result in response:
             if result.type not in context_data:
                 context_data[result.type] = [result.name]
@@ -72,40 +165,23 @@ class FileProcessorTool:
         input_text,
         context_data
     ):
-        from services.agentic_workflow.tools.prompt_processor import PromptProcessorTool
-
         from services import get_openai_llm, get_settings_cached
-        from core.parsers import json_parser
-        
         openai_llm = get_openai_llm(
             model_name=get_settings_cached().OPENAI_CHAT_MODEL
         )
-        
-        cnt = 0
-        while cnt < 5:
-            try:
-                if cnt > 0:
-                    logger.info(f"Retry ops_bot_find_type: {cnt}")
-                agent_config = PromptProcessorTool.load_prompt(get_settings_cached().OPS_AGENT_PROMPT_PATH)['information_classifier']
-                prompt_template = PromptProcessorTool.load_prompt(get_settings_cached().BASE_PROMPT_PATH)
 
-                input_ = f"context_data:\n{context_data}\n\ninput_text:\n{input_text}\n"
-                prompt = PromptProcessorTool.apply_chat_template(
-                    template=prompt_template,
-                    **{**agent_config, **{"input": input_}}
-                )
-                messages = PromptProcessorTool.prepare_chat_messages(prompt=prompt)
-                response = await openai_llm.arun(messages)
-                json_response = json_parser(response)
-                
-                return json_response
-            except Exception as e:
-                cnt += 1
-                logger.error(f"An unhandled error occurred in ops_bot_find_type: {e}", exc_info=True)
-                continue
-        
-        return None
-        
+        input_ = f"context_data:\n{context_data}\n\ninput_text:\n{input_text}\n"
+
+        resp = await self.chat(
+            input_=input_,
+            model=openai_llm,
+            agent_prompt_path=get_settings_cached().OPS_AGENT_PROMPT_PATH,
+            agent_name='information_classifier',
+            func_name='ops_bot_find_type'
+        )
+
+        return resp
+
     async def _save_file(
         self,
         file_stream: io.BytesIO,
@@ -118,7 +194,6 @@ class FileProcessorTool:
 
         async with aiofiles.open(save_file_path, mode='wb') as afp:
             await afp.write(file_stream.getvalue())
-
 
     async def upload_excel_data(
         self,
@@ -146,9 +221,9 @@ class FileProcessorTool:
 
         if use_type and docs:
             context_data = await self.ops_bot_get_context_data()
-            
+
             semaphore = asyncio.Semaphore(CONCURRENT_LIMIT)
-            
+
             async def process_and_update_doc(doc):
                 async with semaphore:
                     try:
@@ -158,7 +233,7 @@ class FileProcessorTool:
                     except Exception as e:
                         logger.error(f"Failed to process doc text: '{doc.text[:50]}...' due to {e}")
                     return doc
-                
+
             tasks = [process_and_update_doc(doc) for doc in docs]
             updated_docs = await asyncio.gather(*tasks)
             docs = updated_docs
@@ -201,44 +276,42 @@ class FileProcessorTool:
 
         return {"status": 200}
 
-    async def upload_and_convert_pdf_to_md(
+    async def ocr_pdf_to_md(
         self,
         file: UploadFile,
     ):
-        # from services import (
-        #     get_google_genai_llm,
-        #     get_settings_cached
-        # )
-        # google_llm = get_google_genai_llm(
-        #     model_name=get_settings_cached().GOOGLEAI_MODEL_THINKING
-        # )
         file_name, file_stream = await parse_file(file)
 
-        # await self._save_file(
-        #     file_stream=file_stream,
-        #     file_name=file_name,
-        #     save_directory=DEFAULT_SAVE_PATH
-        # )
+        await self._save_file(
+            file_stream=file_stream,
+            file_name=file_name,
+            save_directory=DEFAULT_SAVE_PATH
+        )
 
-        save_file_path = DEFAULT_SAVE_PATH / file_name
+        content = await self.ocr_to_md(
+            file_path=DEFAULT_SAVE_PATH / file_name,
+            agent_name='ocr_pdf_to_md_expert'
+        )
 
-        return save_file_path
+        md_filename = Path(file_name).stem + ".md"
+        md_path = DEFAULT_SAVE_PATH / md_filename
 
-        # file_stream.seek(0)
+        async with aiofiles.open(md_path, 'w', encoding='utf-8') as md_file:
+            await md_file.write(content)
 
-        # docs = self.pymupdf_reader.load_data(
-        #     file=file_stream,
-        #     extra_info={"file_name": file_name}
-        # )
+        all_docs, leaf_docs = self.md_reader.load_data(
+            file=md_path,
+            extra_info={"file_name": file_name}
+        )
 
-        # tasks = [
-        #     asyncio.create_task(self.store_docs(docs)),
-        #     asyncio.create_task(self.embed_and_index_documents(docs)),
-        # ]
+        tasks = [
+            asyncio.create_task(self.store_docs(all_docs)),
+            asyncio.create_task(self.embed_and_index_documents(leaf_docs)),
+        ]
 
-        # _ = await asyncio.gather(*tasks)
+        _ = await asyncio.gather(*tasks)
 
-        # return {"status": 200}
+        return {"status": 200}
 
     async def upload_docx_file(
         self,

@@ -44,6 +44,7 @@ async def chat(
         )
         et = timeit.default_timer()
 
+
         return ChatResponse(
             status=200,
             data={
@@ -188,7 +189,6 @@ async def chat_user_stream(
 @app.get(
     "/{bot_name}/files",
     dependencies=[Depends(validate_auth)],
-    # response_model=FileResponse,
     tags=['Files']
 )
 async def get_files_metadata(
@@ -198,7 +198,7 @@ async def get_files_metadata(
     try:
         response = await bot_manager.get_files_metadata()
         return response
-        # return FileResponse(**response)
+
     except AttributeError as e:
         logger.error(f"Attribute error in get_file_metadata for bot '{bot_name}': {e}", exc_info=True)
         raise HTTPException(
@@ -281,16 +281,13 @@ async def upload_excel(
         )
 
 @app.post(
-    "/{bot_name}/files/pdf-to-md",
+    "/{bot_name}/files/pdf/ocr-to-md",
     dependencies=[Depends(validate_auth)],
-    response_model=FileResponse,
     tags=['Files']
 )
-async def upload_pdf_to_md(
+async def ocr_pdf_to_md(
     bot_name: str = Path(...),
     file: UploadFile = File(...),
-    use_type: bool = Literal[True, False],
-    use_pandas: bool = Literal[False, True]
 ):
     if not file.filename.endswith((".pdf")):
         raise HTTPException(
@@ -300,10 +297,11 @@ async def upload_pdf_to_md(
 
     bot_manager: BaseManager = get_bot_manager(bot_name)
     try:
-        response = await bot_manager.upload_pdf_to_md(
+        response = await bot_manager.ocr_pdf_to_md(
             file=file,
         )
-        return FileResponse(**response)
+        return response
+
     except AttributeError as e:
         logger.error(f"Attribute error in upload_pdf_to_md for bot '{bot_name}': {e}", exc_info=True)
         raise HTTPException(

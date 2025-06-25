@@ -12,7 +12,8 @@ from core.loaders import (
     ExcelReader,
     PandasExcelReader,
     PyMuPDFReader,
-    DocxReader
+    DocxReader,
+    MarkdownReader
 )
 from langfuse.llama_index import LlamaIndexInstrumentor
 from qdrant_client import QdrantClient
@@ -152,3 +153,7 @@ def get_pymupdf_reader_cached():
 @lru_cache
 def get_docx_reader_cached():
     return DocxReader()
+
+@lru_cache
+def get_markdown_reader_cached():
+    return MarkdownReader()
