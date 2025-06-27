@@ -1,3 +1,5 @@
+import re
+
 async def tiktokenize(text: str) -> list[str]:
     import tiktoken
 
@@ -14,3 +16,7 @@ async def tiktokenize(text: str) -> list[str]:
         tokens.append(token_str)
 
     return tokens
+
+def simple_tokenize(text: str) -> list[str]:
+    pattern = re.compile(r'\s+|\w+|[^\w\s]', flags=re.UNICODE)
+    return pattern.findall(text)

@@ -23,10 +23,9 @@ class PromptProcessorTool:
         messages.extend(processed_info.history_messages)
         context_str = retrieved_context.context_string
         user_content = (
-            f"INSTRUCTIONS:\n{processed_info.instructions}\n\n"
-            f"Câu hỏi của người dùng:\n{processed_info.original_query}\n\n"
-            f"CONTEXT:\n{context_str}"
-
+            f"## INSTRUCTIONS:\n{processed_info.instructions}\n\n"
+            f"## Câu hỏi của người dùng:\n{processed_info.original_query}\n\n"
+            f"## CONTEXT:\n{context_str}"
         )
         messages.append(ChatMessage(role=MessageRole.USER, content=user_content))
         return messages

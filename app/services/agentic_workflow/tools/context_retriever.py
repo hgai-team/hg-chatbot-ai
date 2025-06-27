@@ -142,7 +142,12 @@ class ContextRetrievalTool:
                         all_relevant_docs_dict[doc_id] = doc
                         global_seen_ids.add(doc_id)
 
-        context_string = "\n\n---\n\n".join(doc.get("text", "") for _, doc in all_relevant_docs_dict.items()).strip()
+        documents_as_markdown = (
+            f"### Tài liệu {i}\n\n{doc.get('text', '')}"
+            for i, doc in enumerate(all_relevant_docs_dict.values(), 1)
+        )
+
+        context_string = "\n\n---\n\n".join(documents_as_markdown)
 
         return ContextRetrieved(
             context_string=context_string,
@@ -262,7 +267,12 @@ class ContextRetrievalTool:
                         all_relevant_docs_dict[doc_id] = doc
                         global_seen_ids.add(doc_id)
 
-        context_string = "\n\n---\n\n".join(doc.get("text", "") for _, doc in all_relevant_docs_dict.items()).strip()
+        documents_as_markdown = (
+            f"### Tài liệu {i}\n\n{doc.get('text', '')}"
+            for i, doc in enumerate(all_relevant_docs_dict.values(), 1)
+        )
+
+        context_string = "\n\n---\n\n".join(documents_as_markdown)
 
         return ContextRetrieved(
             context_string=context_string,

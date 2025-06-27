@@ -1,11 +1,12 @@
 import json
 import random
+import asyncio
 from datetime import datetime
 from uuid import uuid4
 
 from services.agentic_workflow.bots.hr_bot import HrBotService
 from core.storages import BaseChat
-from core.parsers import tiktokenize
+from core.parsers import simple_tokenize
 
 async def yield_data(
     _type: str,
@@ -15,7 +16,7 @@ async def yield_data(
         json.dumps(
                 {
                     'type' : _type,
-                    'tokens' : await tiktokenize(text)
+                    'tokens' : await asyncio.to_thread(simple_tokenize, text)
                 }
             )
         }

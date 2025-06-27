@@ -69,7 +69,6 @@ class OpsBotService(BaseBotService):
         )
 
         self.main_llm = get_openai_llm()
-        
         self.memory_store: MongoDBMemoryStore = get_mongodb_memory_store(
             database_name=database_name,
             collection_name=collection_name
@@ -94,7 +93,7 @@ class OpsBotService(BaseBotService):
                     session_id=session_id
                 )
             except Exception as e:
-                logger.error(f"Error during query analysis for session '{session_id}': {e}", exc_info=True)
+                logger.error(f"VaHaCha - Error during query analysis for session '{session_id}': {e}", exc_info=True)
                 raise HTTPException(status_code=500, detail="Error during query analysis")
 
             try:
@@ -104,7 +103,7 @@ class OpsBotService(BaseBotService):
                     session_id=session_id
                 )
             except Exception as e:
-                logger.error(f"Error during context retrieval for session '{session_id}': {e}", exc_info=True)
+                logger.error(f"VaHaCha - Error during context retrieval for session '{session_id}': {e}", exc_info=True)
                 raise HTTPException(status_code=500, detail="Error during context retrieval")
 
             inal_messages = PPT.format_chat_prompt(
@@ -138,7 +137,7 @@ class OpsBotService(BaseBotService):
                 )
 
             except Exception as e:
-                logger.error(f"Failed to store chat history for session '{session_id}': {e}", exc_info=True)
+                logger.error(f"VaHaCha - Failed to store chat history for session '{session_id}': {e}", exc_info=True)
                 session_title = "New Chat"
 
             return response_text
@@ -164,7 +163,7 @@ class OpsBotService(BaseBotService):
                     session_id=session_id
                 )
             except Exception as e:
-                logger.error(f"Error during query analysis for session '{session_id}': {e}", exc_info=True)
+                logger.error(f"VaHaCha - Error during query analysis for session '{session_id}': {e}", exc_info=True)
                 raise HTTPException(status_code=500, detail="Error during query analysis")
 
             yield {'_type': 'thinking', 'text': 'Hoàn thành phân tích!\n'}
@@ -178,7 +177,7 @@ class OpsBotService(BaseBotService):
                     session_id=session_id
                 )
             except Exception as e:
-                logger.error(f"Error during context retrieval for session '{session_id}': {e}", exc_info=True)
+                logger.error(f"VaHaCha - Error during context retrieval for session '{session_id}': {e}", exc_info=True)
                 raise HTTPException(status_code=500, detail="Error during context retrieval")
 
             yield {'_type': 'thinking', 'text': 'Hoàn thành tìm kiếm thông tin!\n'}
@@ -217,7 +216,7 @@ class OpsBotService(BaseBotService):
                 )
 
             except Exception as e:
-                logger.error(f"Failed to store chat history for session '{session_id}': {e}", exc_info=True)
+                logger.error(f"VaHaCha - Failed to store chat history for session '{session_id}': {e}", exc_info=True)
                 session_title = "New Chat"
 
             yield {'_type': 'response', 'text': response_text}
@@ -279,7 +278,7 @@ class OpsBotService(BaseBotService):
                     session_id=session_id
                 )
             except Exception as e:
-                logger.error(f"Error during query analysis for session '{session_id}': {e}", exc_info=True)
+                logger.error(f"VaHaCha - Error during query analysis for session '{session_id}': {e}", exc_info=True)
                 raise HTTPException(status_code=500, detail="Error during query analysis")
 
             try:
@@ -290,7 +289,7 @@ class OpsBotService(BaseBotService):
                     user_context=user_context.model_dump(),
                 )
             except Exception as e:
-                logger.error(f"Error during context retrieval for session '{session_id}': {e}", exc_info=True)
+                logger.error(f"VaHaCha - Error during context retrieval for session '{session_id}': {e}", exc_info=True)
                 raise HTTPException(status_code=500, detail="Error during context retrieval")
 
             inal_messages = PPT.format_chat_prompt(
@@ -361,7 +360,7 @@ class OpsBotService(BaseBotService):
                     session_id=session_id
                 )
             except Exception as e:
-                logger.error(f"Error during query analysis for session '{session_id}': {e}", exc_info=True)
+                logger.error(f"VaHaCha - Error during query analysis for session '{session_id}': {e}", exc_info=True)
                 raise HTTPException(status_code=500, detail="Error during query analysis")
 
             yield {'_type': 'thinking', 'text': 'Hoàn thành phân tích!\n'}
@@ -376,7 +375,7 @@ class OpsBotService(BaseBotService):
                     user_context=user_context.model_dump(),
                 )
             except Exception as e:
-                logger.error(f"Error during context retrieval for session '{session_id}': {e}", exc_info=True)
+                logger.error(f"VaHaCha - Error during context retrieval for session '{session_id}': {e}", exc_info=True)
                 raise HTTPException(status_code=500, detail="Error during context retrieval")
 
             yield {'_type': 'thinking', 'text': 'Hoàn thành tìm kiếm thông tin!\n'}

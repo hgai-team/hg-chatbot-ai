@@ -1,5 +1,6 @@
 import json
 import random
+import asyncio
 from datetime import datetime
 from uuid import uuid4
 
@@ -9,7 +10,7 @@ from api.schema import (
     UserContext
 )
 from services import get_settings_cached
-from core.parsers import tiktokenize
+from core.parsers import simple_tokenize
 
 async def yield_data(
     _type: str,
@@ -19,7 +20,7 @@ async def yield_data(
         json.dumps(
                 {
                     'type' : _type,
-                    'tokens' : await tiktokenize(text)
+                    'tokens' : await asyncio.to_thread(simple_tokenize, text)
                 }
             )
         }

@@ -184,7 +184,6 @@ class HrBotService(BaseBotService):
             logger.error(f"ChaChaCha - Error during context retrieval for session '{session_id}': {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Error during context retrieval")
 
-
         ids = list(retrieved_context.source_documents.keys())
         retrieved_docs = await self.file_processor.mongodb_doc_store.get(ids)
         all_docs = await self.file_processor.mongodb_doc_store.get_all()
@@ -193,7 +192,12 @@ class HrBotService(BaseBotService):
         reranked_res = await MSMarcoReranker.rerank(query_text, docs)
         reranked_docs = [res[0] for res in reranked_res]
 
-        retrieved_context.context_string = "\n\n---\n\n".join(doc.get("text", "") for doc in reranked_docs)
+        documents_as_markdown = []
+        for i, doc in enumerate(reranked_docs, 1):
+            doc_str = f"### Tài liệu {i}\n\n{doc['text']}"
+            documents_as_markdown.append(doc_str)
+
+        retrieved_context.context_string = "\n\n---\n\n".join(documents_as_markdown)
 
         inal_messages = PPT.format_chat_prompt(
             processed_info=processed_info,
@@ -272,7 +276,12 @@ class HrBotService(BaseBotService):
             reranked_res = await MSMarcoReranker.rerank(query_text, docs)
             reranked_docs = [res[0] for res in reranked_res]
 
-            retrieved_context.context_string = "\n\n---\n\n".join(doc.get("text", "") for doc in reranked_docs)
+            documents_as_markdown = []
+            for i, doc in enumerate(reranked_docs, 1):
+                doc_str = f"### Tài liệu {i}\n\n{doc['text']}"
+                documents_as_markdown.append(doc_str)
+
+            retrieved_context.context_string = "\n\n---\n\n".join(documents_as_markdown)
 
             yield {'_type': 'thinking', 'text': 'Hoàn thành tìm kiếm thông tin!\n'}
 

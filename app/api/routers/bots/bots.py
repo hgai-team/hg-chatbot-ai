@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 @app.post(
     "/{bot_name}/chat",
     dependencies=[Depends(validate_auth)],
-    # response_model=ChatResponse,
+    response_model=ChatResponse,
     tags=['Chat']
 )
 async def chat(
