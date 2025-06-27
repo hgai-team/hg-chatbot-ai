@@ -1,6 +1,8 @@
 import logging
 logger = logging.getLogger(__name__)
 
+import asyncio
+
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from pymongo.collection import Collection
@@ -34,16 +36,22 @@ class MongoDBMemoryStore(BaseMemoryStore):
         self.db: Database = MongoClientManager.get_async_database(
             db_name=database_name if database_name else get_core_settings().MONGODB_BASE_DATABASE_NAME
         )
-        
+
         self.collection: Collection = MongoClientManager.get_async_collection(
             db_name=database_name if database_name else get_core_settings().MONGODB_BASE_DATABASE_NAME,
             collection_name=collection_name if collection_name else get_core_settings().MONGODB_BASE_CHAT_HISTORY_COLLECTION_NAME
         )
 
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self.init_indexes())
+        except RuntimeError:
+            asyncio.run(self.init_indexes())
+
     async def init_indexes(self):
         await self.collection.create_index("user_id")
         await self.collection.create_index("session_id")
-        
+
     async def add_rating(
         self,
         chat_id: str,

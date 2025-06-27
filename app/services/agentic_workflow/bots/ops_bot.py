@@ -11,7 +11,9 @@ from api.schema import UserContext
 from core.storages import BaseChat
 
 from .base import BaseBotService
+from services.agentic_workflow.tools import PromptProcessorTool as PPT
 
+from services import get_settings_cached
 class OpsBotService(BaseBotService):
     def __init__(
         self,
@@ -25,7 +27,6 @@ class OpsBotService(BaseBotService):
         from services.agentic_workflow.tools import (
             get_query_processing_tool,
             get_context_retrieval_tool,
-            get_prompt_processor_tool,
             get_evaluation_agent_tool,
             FileProcessorTool, get_file_processor_tool,
         )
@@ -59,14 +60,16 @@ class OpsBotService(BaseBotService):
             bot_name=self.bot_name,
             agent_prompt_path=self.agent_prompt_path
         )
-        self.prompt_processor = get_prompt_processor_tool()
+
         self.eval_agent = get_evaluation_agent_tool(
             agent_prompt_path=self.agent_prompt_path
         )
         self.google_llm = get_google_genai_llm(
             model_name=get_settings_cached().GOOGLEAI_MODEL,
         )
+
         self.main_llm = get_openai_llm()
+        
         self.memory_store: MongoDBMemoryStore = get_mongodb_memory_store(
             database_name=database_name,
             collection_name=collection_name
@@ -90,7 +93,7 @@ class OpsBotService(BaseBotService):
                     user_id=user_id,
                     session_id=session_id
                 )
-            except:
+            except Exception as e:
                 logger.error(f"Error during query analysis for session '{session_id}': {e}", exc_info=True)
                 raise HTTPException(status_code=500, detail="Error during query analysis")
 
@@ -104,7 +107,7 @@ class OpsBotService(BaseBotService):
                 logger.error(f"Error during context retrieval for session '{session_id}': {e}", exc_info=True)
                 raise HTTPException(status_code=500, detail="Error during context retrieval")
 
-            inal_messages = self.prompt_processor.format_chat_prompt(
+            inal_messages = PPT.format_chat_prompt(
                 processed_info=processed_info,
                 retrieved_context=retrieved_context
             )
@@ -131,7 +134,7 @@ class OpsBotService(BaseBotService):
                     user_id=user_id,
                     session_id=session_id,
                     chat=chat_to_store,
-                    llm=get_google_genai_llm(model_name="models/gemini-2.0-flash")
+                    llm=get_google_genai_llm(model_name=get_settings_cached().GOOGLEAI_MODEL)
                 )
 
             except Exception as e:
@@ -160,7 +163,7 @@ class OpsBotService(BaseBotService):
                     user_id=user_id,
                     session_id=session_id
                 )
-            except:
+            except Exception as e:
                 logger.error(f"Error during query analysis for session '{session_id}': {e}", exc_info=True)
                 raise HTTPException(status_code=500, detail="Error during query analysis")
 
@@ -180,7 +183,7 @@ class OpsBotService(BaseBotService):
 
             yield {'_type': 'thinking', 'text': 'Hoàn thành tìm kiếm thông tin!\n'}
 
-            inal_messages = self.prompt_processor.format_chat_prompt(
+            inal_messages = PPT.format_chat_prompt(
                 processed_info=processed_info,
                 retrieved_context=retrieved_context
             )
@@ -210,7 +213,7 @@ class OpsBotService(BaseBotService):
                     user_id=user_id,
                     session_id=session_id,
                     chat=chat_to_store,
-                    llm=get_google_genai_llm(model_name="models/gemini-2.0-flash")
+                    llm=get_google_genai_llm(model_name=get_settings_cached().GOOGLEAI_MODEL)
                 )
 
             except Exception as e:
@@ -275,7 +278,7 @@ class OpsBotService(BaseBotService):
                     user_id=user_id,
                     session_id=session_id
                 )
-            except:
+            except Exception as e:
                 logger.error(f"Error during query analysis for session '{session_id}': {e}", exc_info=True)
                 raise HTTPException(status_code=500, detail="Error during query analysis")
 
@@ -290,7 +293,7 @@ class OpsBotService(BaseBotService):
                 logger.error(f"Error during context retrieval for session '{session_id}': {e}", exc_info=True)
                 raise HTTPException(status_code=500, detail="Error during context retrieval")
 
-            inal_messages = self.prompt_processor.format_chat_prompt(
+            inal_messages = PPT.format_chat_prompt(
                 processed_info=processed_info,
                 retrieved_context=retrieved_context
             )
@@ -331,7 +334,7 @@ class OpsBotService(BaseBotService):
                 user_id=user_id,
                 session_id=session_id,
                 chat=chat_to_store,
-                llm=get_google_genai_llm(model_name="models/gemini-2.0-flash")
+                llm=get_google_genai_llm(model_name=get_settings_cached().GOOGLEAI_MODEL)
             )
 
             return response_text
@@ -357,7 +360,7 @@ class OpsBotService(BaseBotService):
                     user_id=user_id,
                     session_id=session_id
                 )
-            except:
+            except Exception as e:
                 logger.error(f"Error during query analysis for session '{session_id}': {e}", exc_info=True)
                 raise HTTPException(status_code=500, detail="Error during query analysis")
 
@@ -378,7 +381,7 @@ class OpsBotService(BaseBotService):
 
             yield {'_type': 'thinking', 'text': 'Hoàn thành tìm kiếm thông tin!\n'}
 
-            inal_messages = self.prompt_processor.format_chat_prompt(
+            inal_messages = PPT.format_chat_prompt(
                 processed_info=processed_info,
                 retrieved_context=retrieved_context
             )
@@ -423,7 +426,7 @@ class OpsBotService(BaseBotService):
                 user_id=user_id,
                 session_id=session_id,
                 chat=chat_to_store,
-                llm=get_google_genai_llm(model_name="models/gemini-2.0-flash")
+                llm=get_google_genai_llm(model_name=get_settings_cached().GOOGLEAI_MODEL)
             )
 
 

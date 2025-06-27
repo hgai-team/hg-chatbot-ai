@@ -8,8 +8,18 @@ services:
       - 28888:28888
     volumes:
       - "./app:/app"
+      - "./model_weights:/root/.cache/huggingface/hub"
     networks:
       - hg-chatbot-network
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
     command: uvicorn main:app --host 0.0.0.0 --port 28888 --reload
     depends_on:
       - mongodb-hg-chatbot

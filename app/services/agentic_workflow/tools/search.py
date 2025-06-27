@@ -2,6 +2,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 import os
+import asyncio
+import concurrent.futures
 
 from typing import List
 
@@ -44,6 +46,12 @@ class SearchTool:
             return {'id': doc_dict.get('id_'), 'text': doc_text, 'score': score}
         return None
 
+    async def get_all_ids(
+        self,
+    ):
+        all_ids = await asyncio.to_thread(self.qdrant_vector_store.get_all_ids)
+        return all_ids
+
     def get_embed(
         self,
         query_text: str,
@@ -69,7 +77,7 @@ class SearchTool:
     ):
         if query_text:
             embedding=self.get_embed(query_text=query_text, user_id="demo", session_id="demo")
-            
+
         try:
             results = self.qdrant_vector_store.query(
                 embedding=embedding,
@@ -84,19 +92,18 @@ class SearchTool:
     async def find_documents_by_keywords(
         self,
         keywords: List[str],
+        ids: List[str],
         top_k: int = 20,
     ):
-        import asyncio
-        import concurrent.futures
 
         keywords = [keyword.lower() for keyword in keywords]
         query_string = " ".join(keywords)
 
         try:
             mongodb_scored_docs = []
-            docs_mongo, scores_mongo = await self.mongodb_doc_store.query(query=query_string, top_k=top_k)
+            docs_mongo, scores_mongo = await self.mongodb_doc_store.query(query=query_string, top_k=top_k, doc_ids=ids)
             mongodb_scored_docs = self.format_results(docs_mongo, scores_mongo)
-        
+            
             all_docs: List[Document] = await self.mongodb_doc_store.get_all()
             if all_docs:
                 loop = asyncio.get_running_loop()
@@ -254,8 +261,11 @@ class SearchTool:
 
         results = []
         for doc, score in zip(docs, scores):
+            id = safe_get(doc, "id_")
+            if not id:
+                id = safe_get(doc, "id")
             doc_dict = {
-                "id": safe_get(doc, "id_"),
+                "id": id,
                 "text": safe_get(doc, "text"),
                 "score": score,
             }

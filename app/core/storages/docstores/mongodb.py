@@ -1,4 +1,5 @@
 import json
+import asyncio
 from typing import List, Optional, Union
 
 from core.base import Document
@@ -41,6 +42,12 @@ class MongoDBDocumentStore(BaseDocumentStore):
             db_name=database_name if database_name else get_core_settings().MONGODB_BASE_DATABASE_NAME,
             collection_name=collection_name if collection_name else get_core_settings().MONGODB_BASE_DOC_COLLECTION_NAME
         )
+
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self.init_indexes())
+        except RuntimeError:
+            asyncio.run(self.init_indexes())
 
     async def drop_index(self) -> None:
         async for idx in self.collection.list_indexes():

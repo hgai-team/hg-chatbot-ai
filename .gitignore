@@ -9,6 +9,7 @@ __pycache__/
 **/tests/**
 **/data/**
 **/keys/**
-**/logs/** 
+**/logs/**
 
 *.egg-info/
+model_weights/

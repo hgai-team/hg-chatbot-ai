@@ -71,6 +71,27 @@ class QdrantVectorStore(LlamaIndexVectorStore):
             collection_name=self._collection_name, exact=True
         ).count
 
+    def get_all_ids(self) -> List[str]:
+        """
+        Trả về danh sách tất cả point IDs (UUID) trong Qdrant collection.
+
+        Sử dụng count() để biết tổng số điểm, rồi scroll một lần với limit=total
+        để lấy hết mà không cần quản lý offset.
+        """
+        # 1. Lấy tổng số point
+        total = self.count()
+
+        # 2. Scroll một lần với limit=total, không lấy payload và vector
+        records, _ = self._client.client.scroll(
+            collection_name=self._collection_name,
+            limit=total,
+            with_payload=False,
+            with_vectors=False,
+        )
+
+        # 3. Trả về list ID dưới dạng chuỗi
+        return [str(r.id) for r in records]
+
     def __persist_flow__(self):
         return {
             "collection_name": self._collection_name,

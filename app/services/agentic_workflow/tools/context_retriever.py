@@ -31,7 +31,8 @@ class ContextRetrievalTool:
         keywords: List[str],
         user_id: str,
         session_id: str,
-        idx: int
+        idx: int,
+        ids: list[str]
     ):
         vs_docs_formatted: List[Dict[str, Any]] = []
         fts_docs_formatted: List[Dict[str, Any]] = []
@@ -39,7 +40,7 @@ class ContextRetrievalTool:
         try:
             search_tasks = {}
             search_tasks[f"embed_{idx}"] = asyncio.create_task(self._run_sync_in_thread(self.search.get_embed, query, user_id, session_id))
-            search_tasks[f"fts_{idx}"] = asyncio.create_task(self.search.find_documents_by_keywords(keywords))
+            search_tasks[f"fts_{idx}"] = asyncio.create_task(self.search.find_documents_by_keywords(keywords, ids))
 
             results = await asyncio.gather(*search_tasks.values(), return_exceptions=True)
 
@@ -81,34 +82,36 @@ class ContextRetrievalTool:
                 seen_ids.add(doc_id)
                 combined_results.append(doc)
 
-        relevant_ids = set()
-        try:
-            validation_result = await self.eval_agent.context_relevance(
-                query=query,
-                results=combined_results,
-                user_id=user_id,
-                session_id=session_id,
-                func=self.llm_arunner,
-                agent_name="context_selector",
-            )
+        if "context_selector" in self.eval_agent.agent_prompt:
+            relevant_ids = set()
+            try:
+                validation_result = await self.eval_agent.context_relevance(
+                    query=query,
+                    results=combined_results,
+                    user_id=user_id,
+                    session_id=session_id,
+                    func=self.llm_arunner,
+                    agent_name="context_selector",
+                )
 
-            if isinstance(validation_result, dict):
-                relevant_ids = set(validation_result.get('relevant_context_ids', []))
-            else:
-                relevant_ids = set()
-        except Exception:
-            logger.error(f"Context relevance validation failed for query '{query}': {e}", exc_info=True)
-            return []
+                if isinstance(validation_result, dict):
+                    relevant_ids = set(validation_result.get('relevant_context_ids', []))
+                else:
+                    relevant_ids = set()
+            except Exception:
+                logger.error(f"Context relevance validation failed for query '{query}': {e}", exc_info=True)
+                return []
 
-        seen_ids: Set[str] = set()
-        final_docs_for_query = []
-        for doc in combined_results:
-            doc_id = doc.get("id")
-            if doc_id and doc_id in relevant_ids and doc_id not in seen_ids:
-                final_docs_for_query.append(doc)
+            seen_ids: Set[str] = set()
+            final_docs_for_query = []
+            for doc in combined_results:
+                doc_id = doc.get("id")
+                if doc_id and doc_id in relevant_ids and doc_id not in seen_ids:
+                    final_docs_for_query.append(doc)
 
-        return final_docs_for_query
+            return final_docs_for_query
 
+        return combined_results
     async def retrieve_context(
         self,
         processed_query_info: QueryProcessed,
@@ -119,11 +122,14 @@ class ContextRetrievalTool:
         global_seen_ids = set()
         search_tasks = []
         query_map = {item.get("query"): item.get("keywords", []) for item in processed_query_info.keywords_per_query if item.get("query")}
+        ids = await self.search.get_all_ids()
 
         for idx, (query, keywords) in enumerate(query_map.items()):
-            task = asyncio.create_task(self._search_and_validate_for_query(
-                query, keywords, user_id, session_id, idx
-            ))
+            task = asyncio.create_task(
+                self._search_and_validate_for_query(
+                    query, keywords, user_id, session_id, idx, ids
+                )
+            )
             search_tasks.append(task)
 
         results_from_tasks = await asyncio.gather(*search_tasks, return_exceptions=True)
@@ -136,7 +142,7 @@ class ContextRetrievalTool:
                         all_relevant_docs_dict[doc_id] = doc
                         global_seen_ids.add(doc_id)
 
-        context_string = "\n\n".join(doc.get("text", "") for _, doc in all_relevant_docs_dict.items()).strip()
+        context_string = "\n\n---\n\n".join(doc.get("text", "") for _, doc in all_relevant_docs_dict.items()).strip()
 
         return ContextRetrieved(
             context_string=context_string,
@@ -256,7 +262,7 @@ class ContextRetrievalTool:
                         all_relevant_docs_dict[doc_id] = doc
                         global_seen_ids.add(doc_id)
 
-        context_string = "\n\n".join(doc.get("text", "") for _, doc in all_relevant_docs_dict.items()).strip()
+        context_string = "\n\n---\n\n".join(doc.get("text", "") for _, doc in all_relevant_docs_dict.items()).strip()
 
         return ContextRetrieved(
             context_string=context_string,

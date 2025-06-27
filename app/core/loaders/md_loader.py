@@ -8,6 +8,7 @@ from llama_index.readers.file import FlatReader
 from llama_index.core.node_parser import (
     HierarchicalNodeParser,
     get_leaf_nodes,
+    get_root_nodes
 )
 from llama_index.core.readers.base import BaseReader
 from core.base import Document
@@ -60,10 +61,11 @@ class MarkdownReader(BaseReader):
 
         md_docs = FlatReader().load_data(file)
         all_nodes = self.parser.get_nodes_from_documents(md_docs)
+        root_nodes = get_root_nodes(all_nodes)
         leaf_nodes = get_leaf_nodes(all_nodes)
 
-        all_docs, leaf_docs = [], []
-        for node in all_nodes:
+        root_docs, leaf_docs = [], []
+        for node in root_nodes:
             meta = {
                 "relationships": self._serialize_rels(node.relationships),
                 "start": node.start_char_idx,
@@ -71,7 +73,7 @@ class MarkdownReader(BaseReader):
                 "uploaded_at": datetime.now(),
                 **(extra_info or {})
             }
-            all_docs.append(
+            root_docs.append(
                 Document(
                     id_=node.id_,
                     text=node.get_content(),
@@ -93,4 +95,4 @@ class MarkdownReader(BaseReader):
                     metadata=meta
                 )
             )
-        return all_docs, leaf_docs
+        return root_docs, leaf_docs

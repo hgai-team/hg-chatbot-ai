@@ -47,10 +47,10 @@ class OpenAILLM:
         """
         try:
             response = await self.llm.achat(messages=messages, **kwargs)
-            
-            print('\narun openai==========================\n')
-            print(response.raw)
-            print('\narun openai==========================\n')
+
+            # print('\narun openai==========================\n')
+            # print(response.raw)
+            # print('\narun openai==========================\n')
 
             return response.message.content
         except Exception as e:

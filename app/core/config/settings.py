@@ -26,6 +26,7 @@ class CoreSettings(BaseSettings):
 
     OPS_AGENT_PROMPT_PATH: str
     OPS_AGENT_THINKING_PROMPT_PATH: str
+    HR_AGENT_PROMPT_PATH: str
 
     SQL_DB_PATH: str
 

@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 @app.post(
     "/{bot_name}/chat",
     dependencies=[Depends(validate_auth)],
-    response_model=ChatResponse,
+    # response_model=ChatResponse,
     tags=['Chat']
 )
 async def chat(
@@ -43,7 +43,6 @@ async def chat(
             chat_request=chat_request,
         )
         et = timeit.default_timer()
-
 
         return ChatResponse(
             status=200,

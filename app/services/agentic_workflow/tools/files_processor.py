@@ -23,11 +23,12 @@ from core.storages import (
 )
 
 from core.embeddings import OpenAIEmbedding
+from core.base import Document
 from services.agentic_workflow.tools.prompt_processor import PromptProcessorTool
 
 from core.loaders.utils import get_visible_sheets
 from core.parsers import parse_file, json_parser
-from services import get_settings_cached
+from services import get_settings_cached, get_google_genai_llm
 
 DEFAULT_SAVE_PATH = Path("./data")
 CONCURRENT_LIMIT = 7
@@ -79,28 +80,32 @@ class FileProcessorTool:
         agent_name: str,
         func_name: str
     ):
-        agent_config = PromptProcessorTool.load_prompt(agent_prompt_path)[agent_name]
-        prompt_template = PromptProcessorTool.load_prompt(get_settings_cached().BASE_PROMPT_PATH)
+        async with asyncio.Semaphore(10):
+            agent_config = PromptProcessorTool.load_prompt(agent_prompt_path)[agent_name]
+            prompt_template = PromptProcessorTool.load_prompt(get_settings_cached().BASE_PROMPT_PATH)
 
-        for cnt in range(1, 5):
-            try:
-                if cnt > 0:
-                    logger.info(f"Retry {func_name}: {cnt}")
+            for cnt in range(1, 5):
+                try:
+                    if cnt > 1:
+                        logger.info(f"Retry {func_name}: {cnt}")
 
-                prompt = PromptProcessorTool.apply_chat_template(
-                    template=prompt_template,
-                    **{**agent_config, **{"input": input_}}
-                )
-                messages = PromptProcessorTool.prepare_chat_messages(prompt=prompt)
-                response = await model.arun(messages)
-                json_response = json_parser(response)
+                    prompt = PromptProcessorTool.apply_chat_template(
+                        template=prompt_template,
+                        **{**agent_config, **{"input": input_}}
+                    )
+                    messages = PromptProcessorTool.prepare_chat_messages(prompt=prompt)
+                    response = await model.arun(messages)
 
-                return json_response
-            except Exception as e:
-                logger.error(f"An unhandled error occurred in {func_name}: {e}", exc_info=True)
-                continue
+                    json_response = json_parser(response)
+                    if json_response.get("status", "") == "error":
+                        json_response = response
 
-        return None
+                    return json_response
+                except Exception as e:
+                    logger.error(f"An unhandled error occurred in {func_name}: {e}", exc_info=True)
+                    asyncio.sleep(cnt**2)
+
+            return None
 
     async def ocr_to_md(
         self,
@@ -124,7 +129,7 @@ class FileProcessorTool:
 
         for cnt in range(1, 5):
             try:
-                if cnt > 0:
+                if cnt > 1:
                     logger.info(f"Retry ocr_to_md: {cnt}")
 
                 response = await asyncio.to_thread(
@@ -299,10 +304,33 @@ class FileProcessorTool:
         async with aiofiles.open(md_path, 'w', encoding='utf-8') as md_file:
             await md_file.write(content)
 
-        all_docs, leaf_docs = self.md_reader.load_data(
+        root_docs, leaf_docs = await asyncio.to_thread(
+            self.md_reader.load_data,
             file=md_path,
             extra_info={"file_name": file_name}
         )
+        all_docs = root_docs + leaf_docs
+
+        tasks = [
+            self.chat(
+                input_=f"""WHOLE_DOCUMENT:\n{content}\n\nCHUNK_CONTENT:\n{doc.get_content()}""",
+                model=get_google_genai_llm(model_name=get_settings_cached().GOOGLEAI_MODEL),
+                agent_prompt_path=get_settings_cached().BASE_PROMPT_PATH,
+                agent_name='contextualizer',
+                func_name='ocr_pdf_to_md'
+            )
+            for doc in all_docs
+        ]
+
+        ctxs = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for idx, ctx in enumerate(ctxs):
+            if not isinstance(ctx, Exception):
+                doc: Document = all_docs[idx]
+                doc.extra_info['contextualized_content'] = f"{ctx}\n\n{doc.get_content()}"
+                doc.extra_info['original_content'] = doc.get_content()
+
+        leaf_docs = all_docs[len(root_docs):]
 
         tasks = [
             asyncio.create_task(self.store_docs(all_docs)),
@@ -349,6 +377,9 @@ class FileProcessorTool:
         DEFAULT_SAVE_PATH.mkdir(parents=True, exist_ok=True)
         delete_file_path = DEFAULT_SAVE_PATH / file_name
 
+        md_filename = Path(file_name).stem + ".md"
+        delete_md_path = DEFAULT_SAVE_PATH / md_filename
+
         try:
             cursor = self.mongodb_doc_store.collection.find({"attributes.file_name": file_name}, {"id": 1, "_id": 0})
             docs_to_delete = await cursor.to_list(length=None)
@@ -368,6 +399,9 @@ class FileProcessorTool:
             if delete_file_path.exists():
                 delete_file_path.unlink()
 
+            if delete_md_path.exists():
+                delete_md_path.unlink()
+
             return {"status": 200}
 
         except Exception as e:
@@ -381,6 +415,11 @@ class FileProcessorTool:
         docs
     ):
         try:
+            for idx in range(len(docs)):
+                doc: Document = docs[idx]
+                if 'contextualized_content' in doc.extra_info:
+                    doc.set_content(doc.extra_info['contextualized_content'])
+
             _ = await self.mongodb_doc_store.add(docs)
         except Exception as e:
             raise HTTPException(
@@ -393,6 +432,11 @@ class FileProcessorTool:
         docs
     ):
         try:
+            for idx in range(len(docs)):
+                doc: Document = docs[idx]
+                if 'contextualized_content' in doc.extra_info:
+                    doc.set_content(doc.extra_info['contextualized_content'])
+
             docs_with_embedding = await asyncio.to_thread(self.openai_embedding.get_embeddings, docs)
             _ = await self.qdrant_vector_store.add(docs_with_embedding)
         except Exception as e:
