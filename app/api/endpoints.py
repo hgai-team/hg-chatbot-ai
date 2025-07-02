@@ -11,6 +11,7 @@ from api.routers import (
 from api.security import validate_auth
 from api.schema import MasterData
 from core.storages.client import PostgresEngineManager
+from core.storages.tracestores import TraceSpan, SpanCreate
 
 async def create_db_and_tables():
     async_engine = PostgresEngineManager.init_engine()

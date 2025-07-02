@@ -1,9 +1,10 @@
 import logging
 logger = logging.getLogger(__name__)
 
+import timeit
 import asyncio
 from types import SimpleNamespace
-from typing import List, Dict
+from typing import List, Dict, Any, Callable
 
 from uuid import uuid4
 from datetime import datetime
@@ -12,12 +13,15 @@ from fastapi import HTTPException
 from llama_index.core.schema import TextNode, RelatedNodeInfo, NodeRelationship
 from llama_index.core.retrievers import AutoMergingRetriever
 from llama_index.core.schema import NodeWithScore
+from llama_index.core.llms import ChatResponse
 
 from .base import BaseBotService
 from core.base import Document
-from core.storages import BaseChat
+from core.storages import BaseChat, ChatStatus
 from core.rerank import MSMarcoReranker
 from services.agentic_workflow.tools import PromptProcessorTool as PPT
+from services.agentic_workflow.schema import ContextRetrieved
+from core.storages.client import TracerManager as TM
 
 from services import get_settings_cached
 class HrBotService(BaseBotService):
@@ -73,7 +77,7 @@ class HrBotService(BaseBotService):
             model_name=get_settings_cached().GOOGLEAI_MODEL,
         )
         self.main_llm = get_google_genai_llm(
-            model_name=get_settings_cached().GOOGLEAI_MODEL_EDITOR,
+            model_name=get_settings_cached().GOOGLEAI_MODEL_THINKING,
         )
         self.memory_store: MongoDBMemoryStore = get_mongodb_memory_store(
             database_name=database_name,
@@ -158,12 +162,88 @@ class HrBotService(BaseBotService):
             logger.error(f"Error during _get_parents_and_merge: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Error during _get_parents_and_merge")
 
+    async def _init_base_chat(
+        self,
+        query_text: str,
+        user_id: str,
+        session_id: str,
+    ):
+        chat_id = str(uuid4())
+        session_title = "New Chat"
+
+        chat_to_store = BaseChat(
+            message=query_text,
+            chat_id=chat_id
+        )
+
+        try:
+            session_title = await self.memory_store.add_chat(
+                user_id=user_id,
+                session_id=session_id,
+                chat=chat_to_store,
+                llm=self.google_llm
+            )
+        except Exception as e:
+            logger.error(f"ChaChaCha - Failed to store chat history in _init_base_chat for session '{session_id}': {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Error during _init_base_chat")
+
+        return chat_id, session_title
+
+    async def _update_chat(
+        self,
+        chat_id: str,
+        response: str,
+        retrieved_context: ContextRetrieved,
+        start_time: float,
+        status: int,
+    ):
+        await self.memory_store.update_chat(
+            chat_id=chat_id,
+            response=response,
+            context={
+                "source_document_ids": [id_ for id_, _ in retrieved_context.source_documents.items()]
+            },
+            metadata={
+                'time_taken': timeit.default_timer() - start_time
+            },
+            status=status
+        )
+
+    async def _get_response(
+        self,
+        inal_messages,
+        user_id: str,
+        session_id: str,
+        agent_name: str,
+    ) -> Any:
+        async with TM.trace_span(
+            span_name=f"{self.main_llm.__class__.__name__}_chat_completion",
+            span_type="LLM_AGENT_CALL",
+            custom_metadata={
+                "user_id": user_id,
+                "session_id": session_id,
+                "agent_name": agent_name,
+            }
+        ) as (trace_id, span_id, wrapper):
+            response: ChatResponse = await wrapper(self.main_llm.arun, messages=inal_messages)
+
+        return response.message.content
+
+
     async def process_chat_request(
         self,
         query_text: str,
         user_id: str,
         session_id: str,
     ) -> str:
+        start_time = timeit.default_timer()
+
+        chat_id, session_title = await self._init_base_chat(
+            query_text=query_text,
+            user_id=user_id,
+            session_id=session_id
+        )
+        # analyze query
         try:
             processed_info = await self.query_processor.analyze_query(
                 query_text=query_text,
@@ -174,6 +254,7 @@ class HrBotService(BaseBotService):
             logger.error(f"ChaChaCha - Error during query analysis for session '{session_id}': {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Error during query analysis")
 
+        # retrieve context
         try:
             retrieved_context = await self.context_retriever.retrieve_context(
                 processed_query_info=processed_info,
@@ -184,6 +265,7 @@ class HrBotService(BaseBotService):
             logger.error(f"ChaChaCha - Error during context retrieval for session '{session_id}': {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Error during context retrieval")
 
+        # merge context
         ids = list(retrieved_context.source_documents.keys())
         retrieved_docs = await self.file_processor.mongodb_doc_store.get(ids)
         all_docs = await self.file_processor.mongodb_doc_store.get_all()
@@ -199,41 +281,56 @@ class HrBotService(BaseBotService):
 
         retrieved_context.context_string = "\n\n---\n\n".join(documents_as_markdown)
 
+        # init prompt
         inal_messages = PPT.format_chat_prompt(
             processed_info=processed_info,
             retrieved_context=retrieved_context
         )
 
-        response_text = ""
-        trace_name = f"{self.main_llm.__class__.__name__}_chat_completion"
-        with self.instrumentor.observe(session_id=session_id, user_id=user_id, trace_name=trace_name):
-            response_text = await self.main_llm.arun(messages=inal_messages)
-        self.instrumentor.flush()
-
-        chat_to_store = BaseChat(
-            message=query_text,
-            response=response_text,
-            context={
-                "source_document_ids": [id_ for id_, _ in retrieved_context.source_documents.items()]
-            },
-            timestamp=datetime.now(),
-            chat_id=str(uuid4())
-        )
-
-        try:
-            from services import get_google_genai_llm
-            session_title = await self.memory_store.add_chat(
-                user_id=user_id,
-                session_id=session_id,
-                chat=chat_to_store,
-                llm=get_google_genai_llm(model_name=get_settings_cached().GOOGLEAI_MODEL)
+        # check has stopped
+        ses_his = await self.memory_store.get_session_history(session_id=session_id)
+        if ses_his.history[-1]['status'] == ChatStatus.STOPPED.value:
+            await self.memory_store.add_metadata(
+                chat_id=chat_id,
+                metadata={
+                    'time_taken': timeit.default_timer() - start_time
+                }
             )
+        else:
+            # if sill pending
+            try:
+                response_text = await self._get_response(
+                    inal_messages=inal_messages,
+                    session_id=session_id,
+                    user_id=user_id,
+                    agent_name=self.bot_name
+                )
 
-        except Exception as e:
-            logger.error(f"ChaChaCha - Failed to store chat history for session '{session_id}': {e}", exc_info=True)
-            session_title = "New Chat"
+            except Exception as e:
+                await self._update_chat(
+                    chat_id=chat_id,
+                    response=str(e),
+                    retrieved_context=retrieved_context,
+                    start_time=start_time,
+                    status=ChatStatus.ERROR.value
+                )
 
-        return response_text
+                logger.error(f"ChaChaCha - Error during response for session '{session_id}': {e}", exc_info=True)
+                raise HTTPException(status_code=500, detail="Error during response")
+
+            try:
+                await self._update_chat(
+                    chat_id=chat_id,
+                    response=response_text,
+                    retrieved_context=retrieved_context,
+                    start_time=start_time,
+                    status=ChatStatus.FINISHED.value
+                )
+            except Exception as e:
+                logger.error(f"ChaChaCha - Error during update_chat for session '{session_id}': {e}", exc_info=True)
+                raise HTTPException(status_code=500, detail="Error during update_chat")
+
+            return response_text
 
     async def process_chat_stream_request(
         self,
@@ -241,7 +338,19 @@ class HrBotService(BaseBotService):
         user_id: str,
         session_id: str,
     ):
+        start_time = timeit.default_timer()
+
+        chat_id, session_title = await self._init_base_chat(
+                query_text=query_text,
+                user_id=user_id,
+                session_id=session_id
+            )
+
         try:
+            if session_title:
+                yield {'_type': 'session_title', 'text': session_title}
+            yield {'_type': 'chat_id', 'text': chat_id}
+
             yield {'_type': 'header_thinking', 'text': 'Đang phân tích yêu cầu...\n'}
 
             try:
@@ -290,43 +399,56 @@ class HrBotService(BaseBotService):
                 retrieved_context=retrieved_context
             )
 
-            yield {'_type': 'header_thinking', 'text': 'Đang phản hồi yêu cầu...\n'}
-
-            response_text = ""
-            trace_name = f"{self.main_llm.__class__.__name__}_chat_completion"
-            with self.instrumentor.observe(session_id=session_id, user_id=user_id, trace_name=trace_name):
-                response_text = await self.main_llm.arun(messages=inal_messages)
-            self.instrumentor.flush()
-
-            yield {'_type': 'response', 'text': response_text}
-
-            chat_id = str(uuid4())
-            chat_to_store = BaseChat(
-                message=query_text,
-                response=response_text,
-                context={
-                    "source_document_ids": [id_ for id_, _ in retrieved_context.source_documents.items()]
-                },
-                timestamp=datetime.now(),
-                chat_id=chat_id
-            )
-
-            try:
-                from services import get_google_genai_llm
-                session_title = await self.memory_store.add_chat(
-                    user_id=user_id,
-                    session_id=session_id,
-                    chat=chat_to_store,
-                    llm=get_google_genai_llm(model_name=get_settings_cached().GOOGLEAI_MODEL)
+            ses_his = await self.memory_store.get_session_history(session_id=session_id)
+            if ses_his.history[-1]['status'] == ChatStatus.STOPPED.value:
+                await self.memory_store.add_metadata(
+                    chat_id=chat_id,
+                    metadata={
+                        'time_taken': timeit.default_timer() - start_time
+                    }
                 )
+            else:
+                yield {'_type': 'header_thinking', 'text': 'Đang phản hồi yêu cầu...\n'}
 
-            except Exception as e:
-                logger.error(f"ChaChaCha - Failed to store chat history for session '{session_id}': {e}", exc_info=True)
-                session_title = "New Chat"
+                his_sessions = await self.memory_store.get_user_sessions(
+                    user_id=user_id,
+                )
+                yield {'_type': 'sys_resp_cnt', 'text': str(sum([len(chat) for chat in his_sessions]))}
 
-            if session_title:
-                yield {'_type': 'session_title', 'text': session_title}
-            yield {'_type': 'chat_id', 'text': chat_id}
+                try:
+                    response_text = await self._get_response(
+                        inal_messages=inal_messages,
+                        session_id=session_id,
+                        user_id=user_id,
+                        agent_name=self.bot_name
+                    )
+
+                except Exception as e:
+                    await self._update_chat(
+                        chat_id=chat_id,
+                        response=str(e),
+                        retrieved_context=retrieved_context,
+                        start_time=start_time,
+                        status=ChatStatus.ERROR.value
+                    )
+
+                    logger.error(f"ChaChaCha - Error during response for session '{session_id}': {e}", exc_info=True)
+                    raise HTTPException(status_code=500, detail="Error during response")
+
+                yield {'_type': 'response', 'text': response_text}
+
+                try:
+                    await self._update_chat(
+                        chat_id=chat_id,
+                        response=response_text,
+                        retrieved_context=retrieved_context,
+                        start_time=start_time,
+                        status=ChatStatus.FINISHED.value
+                    )
+                except Exception as e:
+                    logger.error(f"ChaChaCha - Error during update_chat for session '{session_id}': {e}", exc_info=True)
+                    raise HTTPException(status_code=500, detail="Error during update_chat")
+
         except HTTPException as http_exc:
             raise http_exc
         except Exception as e:

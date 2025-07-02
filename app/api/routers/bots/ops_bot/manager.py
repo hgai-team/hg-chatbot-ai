@@ -20,6 +20,7 @@ from .handlers.files import (
 
 
 from services.agentic_workflow.bots.ops_bot import OpsBotService
+from services.agentic_workflow.tools.prompt_processor import PromptProcessorTool as PPT
 from api.routers.bots.base import BaseManager
 from api.schema import (
     ChatRequest, UserContext,
@@ -162,10 +163,12 @@ class OpsBotManager(BaseManager):
                         "session_id": log.session_id,
                         "message": history["message"],
                         "response": history["response"],
+                        "status": history.get("status", None),
                         "timestamp": history["timestamp"].replace(tzinfo=timezone.utc).astimezone(ZoneInfo("Asia/Bangkok")),
                         "chat_id": history["chat_id"],
                         "rating_type": history["rating_type"],
-                        "rating_text": history["rating_text"]
+                        "rating_text": history["rating_text"],
+                        "metadata": history.get("metadata", {})
                     })
 
             if so:
@@ -242,7 +245,7 @@ class OpsBotManager(BaseManager):
         agent_request: AgentRequest,
         user_context: UserContext = None
     ):
-        if not agent_request.agent_name in list(self.ops_bot.prompt_processor.load_prompt(self.ops_bot.agent_prompt_path).keys()):
+        if not agent_request.agent_name in list(PPT.load_prompt(self.ops_bot.agent_prompt_path).keys()):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Not found agent: {agent_request.agent_name}"

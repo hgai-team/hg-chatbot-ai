@@ -20,6 +20,7 @@ motor
 asyncpg
 psycopg2-binary
 sentence-transformers
+tenacity
 
 fastapi
 uvicorn

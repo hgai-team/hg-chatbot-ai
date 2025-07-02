@@ -2,6 +2,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 import timeit
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Path, status, UploadFile, File, Query, Body
 from fastapi.responses import StreamingResponse
@@ -9,6 +10,7 @@ from typing import Literal
 
 from api.security.api_credentials import validate_auth
 from api.schema import (
+    BaseResponse,
     ChatRequest, ChatResponse, UserContext,
     FileResponse,
     SessionResponse, SessionRatingResponse,
@@ -25,6 +27,43 @@ app = APIRouter(
 logger = logging.getLogger(__name__)
 
 # Chat API Endpoints
+@app.post(
+    "/{bot_name}/chat/stop",
+    dependencies=[Depends(validate_auth)],
+    response_model=BaseResponse,
+    tags=['Chat']
+)
+async def chat_stop(
+    chat_id: str,
+    bot_name: str = Path(...),
+):
+    try:
+        bot_manager: BaseManager = get_bot_manager(bot_name)
+
+        await bot_manager.chat_stop(
+            chat_id=chat_id,
+        )
+
+        return BaseResponse(
+            status=200,
+            data=None
+        )
+
+    except HTTPException:
+        raise
+    except AttributeError as e:
+        logger.error(f"Attribute error in chat_stop for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=f"Bot '{bot_name}' does not support chat_stop feature"
+        )
+    except Exception as e:
+        logger.error(f"An unhandled error occurred in chat_stop for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
 @app.post(
     "/{bot_name}/chat",
     dependencies=[Depends(validate_auth)],
@@ -402,7 +441,7 @@ async def add_rating(
         )
 
 # Log API Endpoints
-@app.get(
+@app.post(
     "/{bot_name}/logs",
     dependencies=[Depends(validate_auth)],
     tags=['Logs'],
@@ -410,12 +449,12 @@ async def add_rating(
 )
 async def get_logs(
     bot_name: str = Path(...),
-    limit: int = Query(10, ge=1, le=1000),
-    page_index: int = Query(1),
-    rating_type: list[str] = Query([]),
-    st: str = Query(None, description="Start time filter"),
-    et: str = Query(None, description="End time filter"),
-    so: int = Query(None, description="Sort order (Asc = 1, Desc = -1)"),
+    limit: int = Body(10, ge=1, le=1000),
+    page_index: int = Body(1),
+    rating_type: list[str] = Body([]),
+    st: str = Body("", description="Start time filter"),
+    et: str = Body("", description="End time filter"),
+    so: int = Body(None, description="Sort order (Asc = 1, Desc = -1)"),
 ):
     bot_manager: BaseManager = get_bot_manager(bot_name)
 
@@ -486,6 +525,42 @@ async def get_logs_file(
             detail="Internal server error"
         )
 
+@app.get(
+    "/{bot_name}/logs/sys-resp-cnt",
+    dependencies=[Depends(validate_auth)],
+    response_model=BaseResponse,
+    tags=['Logs']
+)
+async def get_user_sys_resp_cnt(
+    user_id: str = Query(...),
+    bot_name: str = Path(...),
+):
+    bot_manager: BaseManager = get_bot_manager(bot_name)
+
+    try:
+        cnt = await bot_manager.get_user_sys_resp_cnt(
+            user_id=user_id,
+        )
+        return BaseResponse(
+            status=200,
+            data={
+                'sys_resp_cnt': cnt
+            }
+        )
+
+    except AttributeError as e:
+        logger.error(f"Attribute error in get_user_sys_resp_cnt for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=f"Bot '{bot_name}' does not support get_user_sys_resp_cnt feature"
+        )
+    except Exception as e:
+        logger.error(f"An error occurred in get_user_sys_resp_cnt for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
 # Agent API Endpoints
 @app.post(
     "/{bot_name}/agents/eval",
@@ -520,6 +595,37 @@ async def agent_evaluation(
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail=f"Bot '{bot_name}' does not support agent_evaluation feature"
+        )
+    except Exception as e:
+        logger.error(f"An unhandled error occurred in chat for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
+# Trace API Endpoints
+@app.get(
+    "/{bot_name}/traces",
+    dependencies=[Depends(validate_auth)],
+    tags=['Traces']
+)
+async def get_all_traces(
+    bot_name: str = Path(...),
+):
+    try:
+        bot_manager: BaseManager = get_bot_manager(bot_name)
+
+        response = await bot_manager.get_all_traces()
+
+        return response
+
+    except HTTPException:
+        raise
+    except AttributeError as e:
+        logger.error(f"Attribute error in get_all_traces for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=f"Bot '{bot_name}' does not support get_all_traces feature"
         )
     except Exception as e:
         logger.error(f"An unhandled error occurred in chat for bot '{bot_name}': {e}", exc_info=True)

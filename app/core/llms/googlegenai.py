@@ -1,6 +1,5 @@
 from typing import Optional, Any, Generator
 from llama_index.llms.google_genai import GoogleGenAI as LlamaGoogleGenAI
-
 class GoogleGenAILLM:
     """Service for generating text completions using LlamaIndex's integration with Google Generative AI (Gemini)"""
 
@@ -58,12 +57,7 @@ class GoogleGenAILLM:
             Complete text response from the language model.
         """
         response = await self.llm.achat(messages=messages, **kwargs)
-
-        # print('\narun ggai==========================\n')
-        # print(response.model_dump())
-        # print('\narun ggai==========================\n')
-
-        return response.message.content
+        return response
 
     def stream(
         self,

@@ -3,16 +3,26 @@ from typing import List, Optional, Union, Dict, Any
 from datetime import datetime
 from uuid import uuid4
 
+from enum import Enum, auto
+
+class ChatStatus(Enum):
+    PENDING  = auto()
+    FINISHED = auto()
+    STOPPED  = auto()
+    ERROR    = auto()
+
 class BaseChat:
     def __init__(
         self,
-        message: str,
-        response: str,
         chat_id: str,
+        message: str,
+        response: str = None,
+        status: ChatStatus = ChatStatus.PENDING,
         context: Optional[Dict[str, Any]] = None,
         timestamp: Optional[datetime] = None,
         rating_type: Optional[str] = None,
         rating_text: Optional[str] = None,
+        metadata: Optional[Dict[str,Any]] = None,
         **kwargs
     ):
         self.message = message
@@ -20,8 +30,11 @@ class BaseChat:
         self.context = context or {}
         self.timestamp = timestamp or datetime.now()
         self.chat_id = chat_id
+        self.status = status
         self.rating_type = rating_type
         self.rating_text = rating_text
+        self.metadata = metadata or {}
+        self.metadata.update(kwargs)
 
 class ChatHistory:
     """Represents a single chat message"""

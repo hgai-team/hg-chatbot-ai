@@ -133,7 +133,7 @@ class OpsBotService(BaseBotService):
                     user_id=user_id,
                     session_id=session_id,
                     chat=chat_to_store,
-                    llm=get_google_genai_llm(model_name=get_settings_cached().GOOGLEAI_MODEL)
+                    llm=self.google_llm
                 )
 
             except Exception as e:
@@ -212,7 +212,7 @@ class OpsBotService(BaseBotService):
                     user_id=user_id,
                     session_id=session_id,
                     chat=chat_to_store,
-                    llm=get_google_genai_llm(model_name=get_settings_cached().GOOGLEAI_MODEL)
+                    llm=self.google_llm
                 )
 
             except Exception as e:
@@ -333,7 +333,7 @@ class OpsBotService(BaseBotService):
                 user_id=user_id,
                 session_id=session_id,
                 chat=chat_to_store,
-                llm=get_google_genai_llm(model_name=get_settings_cached().GOOGLEAI_MODEL)
+                llm=self.google_llm
             )
 
             return response_text
@@ -425,7 +425,7 @@ class OpsBotService(BaseBotService):
                 user_id=user_id,
                 session_id=session_id,
                 chat=chat_to_store,
-                llm=get_google_genai_llm(model_name=get_settings_cached().GOOGLEAI_MODEL)
+                llm=self.google_llm
             )
 
 

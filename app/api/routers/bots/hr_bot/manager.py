@@ -7,8 +7,12 @@ from fastapi import UploadFile, HTTPException, status
 
 from services.agentic_workflow.bots.hr_bot import HrBotService
 from api.routers.bots.base import BaseManager
+from api.schema import (
+    ChatRequest
+)
 
 from .handlers.chat import (
+    hr_chat_stop,
     hr_chat,
     hr_chat_stream
 )
@@ -19,9 +23,10 @@ from .handlers.files import (
     hr_ocr_pdf_to_md
 )
 
-from api.schema import (
-    ChatRequest
-)
+from .handlers.traces import (
+    hr_get_all_traces
+) 
+
 
 class HrBotManager(BaseManager):
     def __init__(
@@ -30,6 +35,15 @@ class HrBotManager(BaseManager):
         self.hr_bot = HrBotService()
 
     # Chat
+    async def chat_stop(
+        self,
+        chat_id: str,
+    ):
+        await hr_chat_stop(
+            bot_service=self.hr_bot,
+            chat_id=chat_id,
+        )
+
     async def chat(
         self,
         chat_request: ChatRequest,
@@ -82,6 +96,7 @@ class HrBotManager(BaseManager):
         )
         return response
 
+    # Session
     async def get_session(
         self,
         session_id: str
@@ -103,6 +118,7 @@ class HrBotManager(BaseManager):
             rating_text=rating_text
         )
 
+    # Logs
     async def get_logs(
         self,
         page_index: int,
@@ -130,10 +146,12 @@ class HrBotManager(BaseManager):
                         "session_id": log.session_id,
                         "message": history["message"],
                         "response": history["response"],
+                        "status": history.get("status", None),
                         "timestamp": history["timestamp"].replace(tzinfo=timezone.utc).astimezone(ZoneInfo("Asia/Bangkok")),
                         "chat_id": history["chat_id"],
                         "rating_type": history["rating_type"],
-                        "rating_text": history["rating_text"]
+                        "rating_text": history["rating_text"],
+                        "metadata": history.get("metadata", {})
                     })
 
             if so:
@@ -204,3 +222,22 @@ class HrBotManager(BaseManager):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error processing logs: {str(e)}"
             )
+
+    async def get_user_sys_resp_cnt(
+        self,
+        user_id: str
+    ):
+        his_sessions = await self.hr_bot.memory_store.get_user_sessions(
+            user_id=user_id,
+        )
+        return sum([len(chat) for chat in his_sessions])
+
+    # Traces
+    async def get_all_traces(
+        self,
+    ):
+        import json
+        resp = await hr_get_all_traces()
+        from core.storages.tracestores import TraceSpan
+        item: TraceSpan = resp[-1]
+        return item.model_dump()

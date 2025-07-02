@@ -1,3 +1,6 @@
+import logging
+logger = logging.getLogger(__name__)
+
 import asyncio
 
 from typing import List, Tuple, Optional
@@ -20,6 +23,7 @@ class MSMarcoReranker(BaseReranker):
         name = model_name or cls._model_name
 
         if cls._model is None or (model_name and name != cls._model_name):
+            logger.info(f"Init rerank model: {name}")
             cls._model = CrossEncoder(name, device='cuda')
             cls._model_name = name
 

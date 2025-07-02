@@ -51,6 +51,14 @@ async def store_chat(
 
     return session_title, chat_id
 
+async def hr_chat_stop(
+    bot_service: HrBotService,
+    chat_id: str,
+):
+    await bot_service.memory_store.update_chat_status(
+        chat_id=chat_id
+    )
+
 async def hr_chat(
     bot_service: HrBotService,
     query_text: str,

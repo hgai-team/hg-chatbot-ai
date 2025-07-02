@@ -3,9 +3,11 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Optional
 
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
+from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
+from api.config import get_api_settings
 from core.config import get_sql_db_path
 
 logger = logging.getLogger(__name__)
@@ -21,10 +23,12 @@ class PostgresEngineManager:
     def init_engine(cls, uri: Optional[str] = None) -> AsyncEngine:
         if cls._engine is None:
             db_uri = uri or get_sql_db_path()
-
+            echo = True
+            if get_api_settings().ENV == 'pro':
+                echo = False
             cls._engine = create_async_engine(
                 db_uri,
-                echo=True,
+                echo=echo,
                 pool_pre_ping=True,
                 pool_size=5,
                 max_overflow=10,

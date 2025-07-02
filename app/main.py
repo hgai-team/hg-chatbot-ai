@@ -7,11 +7,13 @@ from api.endpoints import app as api_app
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.config import get_api_settings
 from api.endpoints import create_db_and_tables
+
 from core.discord import client
 from core.config import get_core_settings, setup_logging
-from api.config import get_api_settings
-import logging
+from core.storages.client import TracerManager as TM
+from core.storages.tracestores import PostgresTraceStore
 
 from contextlib import asynccontextmanager
 
@@ -21,6 +23,9 @@ logger = logging.getLogger("main")
 async def lifespan(app: FastAPI):
     await create_db_and_tables()
     setup_logging()
+
+    trace_store = PostgresTraceStore()
+    TM.init_tracer(storage_writer=trace_store.upsert_span)
 
     if get_api_settings().ENV == 'pro':
         from core.discord.bot import message_queue, workers, thread_pool

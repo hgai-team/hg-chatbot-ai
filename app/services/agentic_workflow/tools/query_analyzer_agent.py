@@ -2,6 +2,8 @@ import asyncio
 from typing import Dict, Any, List, Union, Callable
 
 from core.parsers import json_parser
+from core.storages.client import TracerManager as TM
+from llama_index.core.llms import ChatResponse
 from services.agentic_workflow.tools.prompt_processor import PromptProcessorTool as PPT
 
 class QueryAnalyzerAgentTool:
@@ -39,25 +41,51 @@ class QueryAnalyzerAgentTool:
         fallback: Callable[[Union[str, List[str]]], Any]
     ) -> Any:
         agent_config = self._get_agent_config(agent_name)
+        # try:
+        #     with self.instrumentor.observe(
+        #         session_id=session_id,
+        #         user_id=user_id,
+        #         trace_name=f"{func.__name__}_{agent_name}"
+        #     ):
+        #         prompt = PPT.apply_chat_template(
+        #             template=self.prompt_template,
+        #             **{**agent_config, **{"input": input_data}}
+        #         )
+        #         messages = PPT.prepare_chat_messages(prompt=prompt)
+        #         response = await func(messages)
+
+        #     await asyncio.to_thread(self.instrumentor.flush)
+
+        #     return json_parser(response)
+
+        # except Exception:
+        #     return fallback(input_data)
+
         try:
-            with self.instrumentor.observe(
-                session_id=session_id,
-                user_id=user_id,
-                trace_name=f"{func.__name__}_{agent_name}"
-            ):
+            async with TM.trace_span(
+                span_name=f"{func.__name__}_{agent_name}",
+                span_type="LLM_AGENT_CALL",
+                custom_metadata={
+                    "user_id": user_id,
+                    "session_id": session_id,
+                    "agent_name": agent_name,
+                }
+            ) as (trace_id, span_id, wrapper):
+
                 prompt = PPT.apply_chat_template(
                     template=self.prompt_template,
                     **{**agent_config, **{"input": input_data}}
                 )
+
                 messages = PPT.prepare_chat_messages(prompt=prompt)
-                response = await func(messages)
 
-            await asyncio.to_thread(self.instrumentor.flush)
+                response: ChatResponse = await wrapper(func, messages=messages)
+                final_result = json_parser(response.message.content)
 
-            return json_parser(response)
-
+            return final_result
         except Exception:
             return fallback(input_data)
+
 
     async def extract_keyword(
         self,

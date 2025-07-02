@@ -8,6 +8,7 @@ from .memstores import (
     BaseMemoryStore,
     BaseChat,
     ChatHistory,
+    ChatStatus,
 )
 
 from .vectorstores import (
@@ -22,6 +23,7 @@ __all__ = [
     "BaseMemoryStore",
     "BaseChat",
     "ChatHistory",
+    "ChatStatus",
 
     "QdrantVectorStore",
 ]

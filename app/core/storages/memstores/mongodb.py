@@ -7,8 +7,9 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from pymongo.collection import Collection
 from pymongo.database import Database
+from llama_index.core.llms import ChatResponse
 
-from .base import BaseMemoryStore, BaseChat, ChatHistory
+from .base import BaseMemoryStore, BaseChat, ChatHistory, ChatStatus
 from core.config import get_core_settings
 from core.storages.client import MongoClientManager
 
@@ -51,6 +52,21 @@ class MongoDBMemoryStore(BaseMemoryStore):
     async def init_indexes(self):
         await self.collection.create_index("user_id")
         await self.collection.create_index("session_id")
+
+    async def add_metadata(
+        self,
+        chat_id: str,
+        metadata: dict
+    ):
+        update_fields = {
+            f"history.$.metadata.{k}": v
+            for k, v in metadata.items()
+        }
+
+        await self.collection.update_one(
+            {"history.chat_id": chat_id},
+            {"$set": update_fields}
+        )
 
     async def add_rating(
         self,
@@ -100,6 +116,8 @@ class MongoDBMemoryStore(BaseMemoryStore):
                             "chat_id": chat.chat_id,
                             "rating_type": chat.rating_type,
                             "rating_text": chat.rating_text,
+                            "metadata": chat.metadata,
+                            "status": chat.status.value
                         }
                     },
                     "$set": {"last_updated": current_time}
@@ -108,6 +126,25 @@ class MongoDBMemoryStore(BaseMemoryStore):
             return None
         else:
             from services.agentic_workflow.tools.prompt_processor import PromptProcessorTool as PPT
+
+            response: ChatResponse = await kwargs.get('llm').arun(
+                messages=PPT.prepare_chat_messages(
+                    system_prompt=(
+                        "Chat Thread Title Expert: Bạn là chuyên gia chuyên tạo tiêu đề cho luồng chat. "
+                        "Nhiệm vụ của bạn là dựa vào câu hỏi gốc để sinh ra một tiêu đề ngắn gọn, súc tích, phản ánh đúng chủ đề của luồng.\n"
+                        "1. Nhận tham số:\n"
+                        "    - question: nội dung câu hỏi gốc.\n"
+                        "2. Phân tích và tổng hợp thông tin để tạo tiêu đề ngắn gọn, dễ hiểu và hấp dẫn, khái quát nội dung luồng chat.\n"
+                        "3. Đầu ra phải là một đoạn text ngắn gọn dài từ 15 đến 30 ký tự."
+                    ),
+                    prompt=f"""
+                        #Input:
+                            question:
+                            {chat.message}
+                        #Output:
+                    """
+                )
+            )
 
             new_chat_history = {
                 "session_id": session_id,
@@ -121,31 +158,53 @@ class MongoDBMemoryStore(BaseMemoryStore):
                         "chat_id": chat.chat_id,
                         "rating_type": chat.rating_type,
                         "rating_text": chat.rating_text,
+                        "metadata": chat.metadata,
+                        "status": chat.status.value
                     }
                 ],
                 "created_at": current_time,
                 "last_updated": current_time,
-                "session_title": await kwargs.get('llm').arun(
-                    messages=PPT.prepare_chat_messages(
-                        system_prompt=(
-                            "Chat Thread Title Expert: Bạn là chuyên gia chuyên tạo tiêu đề cho luồng chat. "
-                            "Nhiệm vụ của bạn là dựa vào câu hỏi gốc để sinh ra một tiêu đề ngắn gọn, súc tích, phản ánh đúng chủ đề của luồng.\n"
-                            "1. Nhận tham số:\n"
-                            "    - question: nội dung câu hỏi gốc.\n"
-                            "2. Phân tích và tổng hợp thông tin để tạo tiêu đề ngắn gọn, dễ hiểu và hấp dẫn, khái quát nội dung luồng chat.\n"
-                            "3. Đầu ra phải là một đoạn text ngắn gọn dài từ 15 đến 30 ký tự."
-                        ),
-                        prompt=f"""
-                            #Input:
-                                question:
-                                {chat.message}
-                            #Output:
-                        """
-                    )
-                )
+                "session_title": response.message.content
             }
             await self.collection.insert_one(new_chat_history)
             return new_chat_history["session_title"]
+
+    async def update_chat(
+        self,
+        chat_id: str,
+        response: str,
+        context: dict,
+        metadata: dict,
+        status: int
+    ):
+        update_fields = {
+            f"history.$.metadata.{k}": v
+            for k, v in metadata.items()
+        }
+
+        await self.collection.update_one(
+            {"history.chat_id": chat_id},
+            {"$set": {
+                    **update_fields,
+                    "history.$.response": response,
+                    "history.$.context": context,
+                    "history.$.status": status,
+                }
+            }
+        )
+
+    async def update_chat_status(
+        self,
+        chat_id: str,
+        status: int = ChatStatus.STOPPED.value
+    ):
+        await self.collection.update_one(
+            {"history.chat_id": chat_id},
+            {"$set": {
+                    "history.$.status": status,
+                }
+            }
+        )
 
     async def get_session_history(
         self,
