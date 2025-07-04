@@ -43,7 +43,7 @@ class GenBotManager(BaseManager):
         chat_request: ChatRequest,
     ):
         pass
-    
+
     async def chat_stream(
         self,
         chat_request: ChatRequest,
@@ -58,17 +58,24 @@ class GenBotManager(BaseManager):
 
     async def get_session(
         self,
-        *args,
-        **kwargs
-    ) -> str:
-        pass
+        session_id: str
+    ):
+        response = await self.gen_bot.memory_store.get_session_history(
+            session_id=session_id
+        )
+        return response
 
     async def add_rating(
         self,
-        *args,
-        **kwargs
-    ) -> str:
-        pass
+        chat_id: str,
+        rating_type: str = None,
+        rating_text: str = None,
+    ):
+        await self.gen_bot.memory_store.add_rating(
+            chat_id=chat_id,
+            rating_type=rating_type,
+            rating_text=rating_text
+        )
 
     async def get_logs(
         self,
