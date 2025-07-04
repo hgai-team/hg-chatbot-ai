@@ -62,7 +62,7 @@ class QueryProcessingTool:
             raise HTTPException(status_code=500, detail="Failed to get session history")
 
         if chat_history and chat_history.history:
-            recent_chats = [item for item in chat_history.history[-5:] if isinstance(item, dict)]
+            recent_chats = [item for item in chat_history.history[-10:] if isinstance(item, dict)]
             for chat in recent_chats:
                 user_msg = chat.get('message')
                 assistant_msg = chat.get('response')

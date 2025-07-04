@@ -67,7 +67,7 @@ async def chat_stop(
 @app.post(
     "/{bot_name}/chat",
     dependencies=[Depends(validate_auth)],
-    response_model=ChatResponse,
+    # response_model=ChatResponse,
     tags=['Chat']
 )
 async def chat(
@@ -82,14 +82,20 @@ async def chat(
             chat_request=chat_request,
         )
         et = timeit.default_timer()
-
-        return ChatResponse(
-            status=200,
-            data={
+        return {
+            "status": 200,
+            "data": {
                 "response": response,
                 "time_taken": et - st
             }
-        )
+        }
+        # return ChatResponse(
+        #     status=200,
+        #     data={
+        #         "response": response,
+        #         "time_taken": et - st
+        #     }
+        # )
 
     except HTTPException:
         raise

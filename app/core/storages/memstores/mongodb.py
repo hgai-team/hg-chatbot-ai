@@ -172,10 +172,10 @@ class MongoDBMemoryStore(BaseMemoryStore):
     async def update_chat(
         self,
         chat_id: str,
-        response: str,
-        context: dict,
-        metadata: dict,
-        status: int
+        status: int,
+        response: str = None,
+        metadata: dict = {},
+        context: dict = {},
     ):
         update_fields = {
             f"history.$.metadata.{k}": v

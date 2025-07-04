@@ -1,6 +1,6 @@
 services:
   hg-chatbot:
-    image: krntl/hgcb:latest
+    image: krntl/hgcb:demo
     container_name: dev-hg-chatbot
     env_file:
       - .env
@@ -92,6 +92,13 @@ services:
         reservations:
           memory: 256M
           cpus: '2.0'
+
+  crawl-comment:
+    image: krntl/crawl-comment:latest
+
+    networks:
+      - hg-chatbot-network
+    restart: always
 
 networks:
   hg-chatbot-network:
