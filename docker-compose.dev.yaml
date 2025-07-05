@@ -1,6 +1,6 @@
 services:
   hg-chatbot:
-    image: krntl/hgcb:demo
+    image: krntl/hgcb:latest
     container_name: dev-hg-chatbot
     env_file:
       - .env

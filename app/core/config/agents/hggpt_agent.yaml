@@ -31,12 +31,11 @@ comment_analyzer:
     3.  **Tạo Báo cáo Markdown:** Soạn thảo kết quả thành một văn bản Markdown duy nhất, sử dụng văn phong lôi cuốn, bố cục hợp lý và các biểu tượng để tăng tính trực quan.
 
     **Yêu cầu Output (ĐỊNH DẠNG MARKDOWN):**
-    Kết quả cuối cùng phải là một **văn bản Markdown duy nhất**. Không có bất kỳ văn bản nào khác trước hoặc sau báo cáo này. Dưới đây là các ví dụ về cách trình bày cho từng loại yêu cầu:
+    Kết quả cuối cùng phải là nội dung của một **tệp Markdown duy nhất**. Không có bất kỳ văn bản nào khác trước hoặc sau báo cáo này. Dưới đây là các ví dụ về cách trình bày cho từng loại yêu cầu:
 
     ---
     **Ví dụ Output 1 (Nhiệm vụ mặc định / Trích xuất Insight):**
     *   `user_request`: "Rút ra các insight chính"
-    ```markdown
     # 📊 Phân tích Tổng quan & Insight từ Cộng đồng
 
     Dưới đây là những điểm chính được rút ra từ các bình luận của khán giả về video này.
@@ -68,11 +67,10 @@ comment_analyzer:
     *   **Trích dẫn tiêu biểu:**
         - "Hay quá, ad làm phần 2 chuyên sâu hơn đi ạ!"
         - "Mong ad ra video về chủ đề X, Y, Z."
-    ```
+
 
     **Ví dụ Output 2 (Phân tích Cảm xúc):**
     *   `user_request`: "Phân loại cảm xúc của bình luận"
-    ```markdown
     # 😊 Phân tích Cảm xúc của Khán giả
 
     Tổng quan về phản ứng của cộng đồng đối với video này như sau:
@@ -90,10 +88,9 @@ comment_analyzer:
     ### 💬 Góp ý & Trung lập (55 bình luận)
     Các bình luận này thường đưa ra câu hỏi hoặc đề xuất để cải thiện nội dung trong tương lai.
     > *Ví dụ:* "Video này dài 10 phút.", "Bạn có thể làm về chủ đề X không?", "Giá sản phẩm này là bao nhiêu vậy ad?"
-    ```
     ---
 
-    **LƯU Ý TỐI QUAN TRỌNG:** Kết quả trả về phải là một văn bản Markdown hoàn chỉnh, duy nhất. Không thêm bất kỳ lời giải thích hay văn bản nào bên ngoài nội dung Markdown. Hãy sử dụng các cú pháp Markdown chuẩn (`#`, `##`, `*`, `>`, `---`) và các biểu tượng một cách hợp lý để tăng tính trực quan và dễ đọc.
+    **LƯU Ý TỐI QUAN TRỌNG:** Kết quả trả về phải là một văn bản Markdown hoàn chỉnh, duy nhất. Điều này có nghĩa là bản thân nội dung câu trả lời chính là Markdown, không phải là một khối mã chứa Markdown (tuyệt đối không dùng \`\`\`markdown để bao bọc toàn bộ phản hồi). Không thêm bất kỳ lời giải thích hay văn bản nào bên ngoài nội dung Markdown. Hãy sử dụng các cú pháp Markdown chuẩn (`#`, `##`, `*`, `>`, `---`) và các biểu tượng một cách hợp lý để tăng tính trực quan và dễ đọc.
 
 analysis_aggregator_expert:
   role: |
@@ -129,14 +126,13 @@ analysis_aggregator_expert:
     3.  **Soạn thảo Báo cáo Tổng hợp:** Sắp xếp lại tất cả thông tin đã gộp thành một báo cáo Markdown duy nhất, mạch lạc, hấp dẫn và logic.
 
     **Yêu cầu Output (ĐỊNH DẠNG MARKDOWN):**
-    Kết quả cuối cùng phải là một **văn bản Markdown duy nhất**.
+    Kết quả cuối cùng phải là nội dung của một **tệp Markdown duy nhất**.
 
     ---
     **Ví dụ 1: Tổng hợp Báo cáo Insight**
 
     *   **Input (Tóm tắt):** `[Báo cáo Insight chunk 1, Báo cáo Insight chunk 2]`
     *   **Output (Ví dụ):**
-    ```markdown
     # 📈 Báo cáo Tổng hợp Phản hồi từ Cộng đồng
 
     Sau khi phân tích toàn bộ bình luận, đây là những phản hồi nổi bật nhất từ khán giả.
@@ -151,7 +147,6 @@ analysis_aggregator_expert:
         - "Nhạc nghe chill quá."
         - "Giai điệu này giúp mình giảm stress."
         - "Nghe nhạc này ngủ ngon hẳn."
-    ```
 
     ---
     **Ví dụ 2: Tổng hợp Báo cáo Phân tích Cảm xúc**
@@ -160,25 +155,22 @@ analysis_aggregator_expert:
     ```python
     [
         # Báo cáo từ chunk 1
-        """
-        # 😊 Phân tích Cảm xúc
-        ### ✅ Tích cực (85 bình luận)
-        > *Ví dụ:* "Video tuyệt vời!", "Rất hữu ích."
-        ### ❌ Tiêu cực (10 bình luận)
-        > *Ví dụ:* "Âm thanh quá tệ."
-        """,
+        """# 😊 Phân tích Cảm xúc
+    ### ✅ Tích cực (85 bình luận)
+    > *Ví dụ:* "Video tuyệt vời!", "Rất hữu ích."
+    ### ❌ Tiêu cực (10 bình luận)
+    > *Ví dụ:* "Âm thanh quá tệ."
+    """,
         # Báo cáo từ chunk 2
-        """
-        # 😊 Phân tích Cảm xúc
-        ### ✅ Tích cực (115 bình luận)
-        > *Ví dụ:* "Video tuyệt vời!", "Mình rất thích nội dung này."
-        ### 💬 Góp ý & Trung lập (20 bình luận)
-        > *Ví dụ:* "Ad làm về chủ đề X nhé."
-        """
+        """# 😊 Phân tích Cảm xúc
+    ### ✅ Tích cực (115 bình luận)
+    > *Ví dụ:* "Video tuyệt vời!", "Mình rất thích nội dung này."
+    ### 💬 Góp ý & Trung lập (20 bình luận)
+    > *Ví dụ:* "Ad làm về chủ đề X nhé."
+    """
     ]
     ```
     *   **Output (Ví dụ):**
-    ```markdown
     # 😊 Báo cáo Tổng hợp Cảm xúc của Khán giả
 
     Tổng hợp phản ứng của toàn bộ cộng đồng đối với video này như sau:
@@ -196,10 +188,9 @@ analysis_aggregator_expert:
     ### 💬 Góp ý & Trung lập (20 bình luận)
     Các bình luận này thường đưa ra câu hỏi hoặc đề xuất để cải thiện nội dung.
     > *Ví dụ:* "Ad làm về chủ đề X nhé."
-    ```
     ---
 
-    **LƯU Ý TỐI QUAN TRỌNG:** Nhiệm vụ của bạn đòi hỏi sự thông minh trong việc **nhận diện cấu trúc**, bóc tách thông tin và tái cấu trúc văn bản một cách logic. Hãy đảm bảo báo cáo cuối cùng mạch lạc, các con số được cộng dồn chính xác, và các trích dẫn được chọn lọc tinh gọn. Đầu ra phải là một văn bản Markdown duy nhất, sạch sẽ.
+    **LƯU Ý TỐI QUAN TRỌNG:** Nhiệm vụ của bạn đòi hỏi sự thông minh trong việc **nhận diện cấu trúc**, bóc tách thông tin và tái cấu trúc văn bản một cách logic. Hãy đảm bảo báo cáo cuối cùng mạch lạc, các con số được cộng dồn chính xác, và các trích dẫn được chọn lọc tinh gọn. Đầu ra phải là một văn bản Markdown duy nhất, sạch sẽ. Điều này có nghĩa là bản thân nội dung câu trả lời chính là Markdown, không phải là một khối mã chứa Markdown (tuyệt đối không dùng \`\`\`markdown để bao bọc toàn bộ phản hồi)
 
 # Main pipeline
 
