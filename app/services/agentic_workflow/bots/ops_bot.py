@@ -1,19 +1,27 @@
 import logging
 logger = logging.getLogger(__name__)
 
+import timeit
 import asyncio
 
 from datetime import datetime
 from fastapi import HTTPException
 from uuid import uuid4
 
-from api.schema import UserContext
-from core.storages import BaseChat
+from llama_index.core.llms import ChatResponse
+
+from typing import List, Dict, Any, Callable
 
 from .base import BaseBotService
-from services.agentic_workflow.tools import PromptProcessorTool as PPT
 
-from services import get_settings_cached
+from core.storages import BaseChat, ChatStatus
+from core.rerank import MSMarcoReranker
+from core.storages.client import TracerManager as TM
+
+from services.agentic_workflow.tools import PromptProcessorTool as PPT
+from services.agentic_workflow.schema import ContextRetrieved
+
+
 class OpsBotService(BaseBotService):
     def __init__(
         self,
@@ -68,16 +76,81 @@ class OpsBotService(BaseBotService):
             model_name=get_settings_cached().GOOGLEAI_MODEL,
         )
 
-        self.main_llm = get_openai_llm()
+        self.main_llm = get_google_genai_llm(
+            model_name=get_settings_cached().GOOGLEAI_MODEL_THINKING,
+        )
         self.memory_store: MongoDBMemoryStore = get_mongodb_memory_store(
             database_name=database_name,
             collection_name=collection_name
         )
         self.instrumentor = get_langfuse_instrumentor_cached()
 
-    async def _run_sync_in_thread(self, func, *args, **kwargs):
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, func, *args, **kwargs)
+    async def _init_base_chat(
+        self,
+        query_text: str,
+        user_id: str,
+        session_id: str,
+    ):
+        chat_id = str(uuid4())
+        session_title = "New Chat"
+
+        chat_to_store = BaseChat(
+            message=query_text,
+            chat_id=chat_id
+        )
+
+        try:
+            session_title = await self.memory_store.add_chat(
+                user_id=user_id,
+                session_id=session_id,
+                chat=chat_to_store,
+                llm=self.google_llm
+            )
+        except Exception as e:
+            logger.error(f"VaHaCha - Failed to store chat history in _init_base_chat for session '{session_id}': {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Error during _init_base_chat")
+
+        return chat_id, session_title
+
+    async def _update_chat(
+        self,
+        chat_id: str,
+        response: str,
+        retrieved_context: ContextRetrieved,
+        start_time: float,
+        status: int,
+    ):
+        await self.memory_store.update_chat(
+            chat_id=chat_id,
+            response=response,
+            context={
+                "source_document_ids": [id_ for id_, _ in retrieved_context.source_documents.items()]
+            },
+            metadata={
+                'time_taken': timeit.default_timer() - start_time
+            },
+            status=status
+        )
+
+    async def _get_response(
+        self,
+        inal_messages,
+        user_id: str,
+        session_id: str,
+        agent_name: str,
+    ) -> Any:
+        async with TM.trace_span(
+            span_name=f"{self.main_llm.__class__.__name__}_chat_completion",
+            span_type="LLM_AGENT_CALL",
+            custom_metadata={
+                "user_id": user_id,
+                "session_id": session_id,
+                "agent_name": agent_name,
+            }
+        ) as (trace_id, span_id, wrapper):
+            response: ChatResponse = await wrapper(self.main_llm.arun, messages=inal_messages)
+
+        return response.message.content
 
     async def process_chat_request(
         self,
@@ -153,7 +226,19 @@ class OpsBotService(BaseBotService):
         user_id: str,
         session_id: str,
     ):
+        start_time = timeit.default_timer()
+
+        chat_id, session_title = await self._init_base_chat(
+                query_text=query_text,
+                user_id=user_id,
+                session_id=session_id
+            )
+
         try:
+            if session_title:
+                yield {'_type': 'session_title', 'text': session_title}
+            yield {'_type': 'chat_id', 'text': chat_id}
+
             yield {'_type': 'header_thinking', 'text': 'Đang phân tích yêu cầu...\n'}
 
             try:
@@ -180,6 +265,27 @@ class OpsBotService(BaseBotService):
                 logger.error(f"VaHaCha - Error during context retrieval for session '{session_id}': {e}", exc_info=True)
                 raise HTTPException(status_code=500, detail="Error during context retrieval")
 
+            ids = list(retrieved_context.source_documents.keys())
+            retrieved_docs = await self.file_processor.mongodb_doc_store.get(ids)
+            docs = [
+                {
+                    'id': doc.id_,
+                    'text': doc.get_content(),
+                    'metadata': doc.metadata
+                }
+                for doc in retrieved_docs
+            ]
+
+            reranked_res = await MSMarcoReranker.rerank(query_text, docs)
+            reranked_docs = [res[0] for res in reranked_res]
+
+            documents_as_markdown = []
+            for i, doc in enumerate(reranked_docs, 1):
+                doc_str = f"### Tài liệu {i}\n\n{doc['text']}"
+                documents_as_markdown.append(doc_str)
+
+            retrieved_context.context_string = "\n\n---\n\n".join(documents_as_markdown)
+
             yield {'_type': 'thinking', 'text': 'Hoàn thành tìm kiếm thông tin!\n'}
 
             inal_messages = PPT.format_chat_prompt(
@@ -187,170 +293,84 @@ class OpsBotService(BaseBotService):
                 retrieved_context=retrieved_context
             )
 
-            yield {'_type': 'header_thinking', 'text': 'Đang phản hồi yêu cầu...\n'}
-
-            response_text = ""
-            trace_name = f"{self.main_llm.__class__.__name__}_chat_completion"
-            with self.instrumentor.observe(session_id=session_id, user_id=user_id, trace_name=trace_name):
-                response_text = await self.main_llm.arun(messages=inal_messages)
-            self.instrumentor.flush()
-
-            chat_id = str(uuid4())
-            chat_to_store = BaseChat(
-                message=query_text,
-                response=response_text,
-                context={
-                    "source_document_ids": [id_ for id_, _ in retrieved_context.source_documents.items()]
-                },
-                timestamp=datetime.now(),
-                chat_id=chat_id
-            )
-
-            try:
-                from services import get_google_genai_llm
-                session_title = await self.memory_store.add_chat(
-                    user_id=user_id,
-                    session_id=session_id,
-                    chat=chat_to_store,
-                    llm=self.google_llm
+            ses_his = await self.memory_store.get_session_history(session_id=session_id)
+            if ses_his.history[-1]['status'] == ChatStatus.STOPPED.value:
+                await self.memory_store.add_metadata(
+                    chat_id=chat_id,
+                    metadata={
+                        'time_taken': timeit.default_timer() - start_time
+                    }
                 )
+            else:
+                yield {'_type': 'header_thinking', 'text': 'Đang phản hồi yêu cầu...\n'}
 
-            except Exception as e:
-                logger.error(f"VaHaCha - Failed to store chat history for session '{session_id}': {e}", exc_info=True)
-                session_title = "New Chat"
+                his_sessions = await self.memory_store.get_user_sessions(
+                    user_id=user_id,
+                )
+                yield {'_type': 'sys_resp_cnt', 'text': str(sum([len(chat) for chat in his_sessions]))}
 
-            yield {'_type': 'response', 'text': response_text}
+                try:
+                    response_text = await self._get_response(
+                        inal_messages=inal_messages,
+                        session_id=session_id,
+                        user_id=user_id,
+                        agent_name=self.bot_name
+                    )
 
-            if session_title:
-                yield {'_type': 'session_title', 'text': session_title}
-            yield {'_type': 'chat_id', 'text': chat_id}
+                except Exception as e:
+                    await self._update_chat(
+                        chat_id=chat_id,
+                        response=str(e),
+                        retrieved_context=retrieved_context,
+                        start_time=start_time,
+                        status=ChatStatus.ERROR.value
+                    )
+
+                    logger.error(f"VaHaCha - Error during response for session '{session_id}': {e}", exc_info=True)
+                    raise HTTPException(status_code=500, detail="Error during response")
+
+                yield {'_type': 'response', 'text': response_text}
+
+                try:
+                    await self._update_chat(
+                        chat_id=chat_id,
+                        response=response_text,
+                        retrieved_context=retrieved_context,
+                        start_time=start_time,
+                        status=ChatStatus.FINISHED.value
+                    )
+                except Exception as e:
+                    logger.error(f"VaHaCha - Error during update_chat for session '{session_id}': {e}", exc_info=True)
+                    raise HTTPException(status_code=500, detail="Error during update_chat")
 
         except HTTPException as http_exc:
             raise http_exc
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"An internal error occurred during chat processing. {e}")
-
-    async def user_validate_chat_request(
-        self,
-        query_text: str,
-        user_id: str,
-        session_id: str,
-        user_context: UserContext
-    ):
-        analysis_tasks = {
-            "query_classifier": asyncio.create_task(
-                    self.eval_agent.validate(
-                    query=f"""user_query:\n{query_text}\n\nuser_context:\n{user_context.model_dump_json().lower()}""",
-                    user_id=user_id,
-                    session_id=session_id,
-                    func=self.google_llm.arun, agent_name="query_classifier"
-                )
-            ),
-            "safety_guard": asyncio.create_task(
-                    self.eval_agent.validate(
-                    query=query_text, user_id=user_id, session_id=session_id,
-                    func=self.google_llm.arun, agent_name="safety_guard"
-                )
-            ),
-        }
-        results = await asyncio.gather(*analysis_tasks.values(), return_exceptions=True)
-        task_names = list(analysis_tasks.keys())
-        safety_guard_response = results[task_names.index("safety_guard")]
-        query_classifier_response = results[task_names.index("query_classifier")]
-
-        if safety_guard_response.get("status") == "invalid":
-            return safety_guard_response
-
-        return query_classifier_response
-
-    async def user_process_chat_request(
-        self,
-        query_text: str,
-        user_id: str,
-        session_id: str,
-        user_context: UserContext
-    ) -> str:
-        try:
-            try:
-                processed_info = await self.query_processor.analyze_query(
-                    query_text=query_text,
-                    user_id=user_id,
-                    session_id=session_id
-                )
-            except Exception as e:
-                logger.error(f"VaHaCha - Error during query analysis for session '{session_id}': {e}", exc_info=True)
-                raise HTTPException(status_code=500, detail="Error during query analysis")
-
-            try:
-                retrieved_context = await self.context_retriever.user_retrieve_context(
-                    processed_query_info=processed_info,
-                    user_id=user_id,
-                    session_id=user_id,
-                    user_context=user_context.model_dump(),
-                )
-            except Exception as e:
-                logger.error(f"VaHaCha - Error during context retrieval for session '{session_id}': {e}", exc_info=True)
-                raise HTTPException(status_code=500, detail="Error during context retrieval")
-
-            inal_messages = PPT.format_chat_prompt(
-                processed_info=processed_info,
-                retrieved_context=retrieved_context
-            )
-
-            response_text = ""
-            trace_name = f"{self.main_llm.__class__.__name__}_chat_completion"
-            with self.instrumentor.observe(session_id=session_id, user_id=user_id, trace_name=trace_name):
-                response_text = await self.main_llm.arun(messages=inal_messages)
-
-            self.instrumentor.flush()
-
-            from services import (
-                get_google_genai_llm,
-                get_settings_cached
-            )
-            google_llm = get_google_genai_llm(
-                model_name=get_settings_cached().GOOGLEAI_MODEL_EDITOR
-            )
-            response_permission_editor_response = await self.eval_agent.validate(
-                query=f"""question:\n{query_text}\n\question_context:\n{response_text}\n\nuser_context:\n{user_context.model_dump_json(exclude='role').lower()}""",
-                user_id=user_id,
-                session_id=session_id,
-                func=google_llm.arun, agent_name="response_permission_editor"
-            )
-            response_text = response_permission_editor_response.get("answer")
-
-            chat_to_store = BaseChat(
-                message=query_text,
-                response=response_text,
-                context={
-                    "source_document_ids": [id_ for id_, _ in retrieved_context.source_documents.items()]
-                },
-                timestamp=datetime.now(),
-                chat_id=str(uuid4())
-            )
-
-            _ = await self.memory_store.add_chat(
-                user_id=user_id,
-                session_id=session_id,
-                chat=chat_to_store,
-                llm=self.google_llm
-            )
-
-            return response_text
-
-        except HTTPException as http_exc:
-            raise http_exc
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"An internal error occurred during chat processing. {e}")
+            logger.error(f"VaHaCha - An internal error occurred during chat processing: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"VaHaCha - An internal error occurred during chat processing. {e}")
 
     async def user_process_chat_request_stream(
         self,
         query_text: str,
         user_id: str,
         session_id: str,
-        user_context: UserContext
+        user_roles: list[dict]
     ):
+        start_time = timeit.default_timer()
+
+        chat_id, session_title = await self._init_base_chat(
+                query_text=query_text,
+                user_id=user_id,
+                session_id=session_id
+            )
+
+        ids = await self.context_retriever.search.mongodb_doc_store.find_docs_id_for_user(user_roles=user_roles)
+
         try:
+            if session_title:
+                yield {'_type': 'session_title', 'text': session_title}
+            yield {'_type': 'chat_id', 'text': chat_id}
+
             yield {'_type': 'header_thinking', 'text': 'Đang phân tích yêu cầu...\n'}
 
             try:
@@ -368,15 +388,36 @@ class OpsBotService(BaseBotService):
             yield {'_type': 'header_thinking', 'text': 'Đang tìm kiếm thông tin...\n'}
 
             try:
-                retrieved_context = await self.context_retriever.user_retrieve_context(
+                retrieved_context = await self.context_retriever.retrieve_context(
                     processed_query_info=processed_info,
                     user_id=user_id,
                     session_id=user_id,
-                    user_context=user_context.model_dump(),
+                    ids=ids
                 )
             except Exception as e:
                 logger.error(f"VaHaCha - Error during context retrieval for session '{session_id}': {e}", exc_info=True)
                 raise HTTPException(status_code=500, detail="Error during context retrieval")
+
+            ids = list(retrieved_context.source_documents.keys())
+            retrieved_docs = await self.file_processor.mongodb_doc_store.get(ids)
+            docs = [
+                {
+                    'id': doc.id_,
+                    'text': doc.get_content(),
+                    'metadata': doc.metadata
+                }
+                for doc in retrieved_docs
+            ]
+
+            reranked_res = await MSMarcoReranker.rerank(query_text, docs)
+            reranked_docs = [res[0] for res in reranked_res]
+
+            documents_as_markdown = []
+            for i, doc in enumerate(reranked_docs, 1):
+                doc_str = f"### Tài liệu {i}\n\n{doc['text']}"
+                documents_as_markdown.append(doc_str)
+
+            retrieved_context.context_string = "\n\n---\n\n".join(documents_as_markdown)
 
             yield {'_type': 'thinking', 'text': 'Hoàn thành tìm kiếm thông tin!\n'}
 
@@ -385,57 +426,58 @@ class OpsBotService(BaseBotService):
                 retrieved_context=retrieved_context
             )
 
-            yield {'_type': 'header_thinking', 'text': 'Đang phản hồi yêu cầu...\n'}
+            ses_his = await self.memory_store.get_session_history(session_id=session_id)
+            if ses_his.history[-1]['status'] == ChatStatus.STOPPED.value:
+                await self.memory_store.add_metadata(
+                    chat_id=chat_id,
+                    metadata={
+                        'time_taken': timeit.default_timer() - start_time
+                    }
+                )
+            else:
+                yield {'_type': 'header_thinking', 'text': 'Đang phản hồi yêu cầu...\n'}
 
-            response_text = ""
-            trace_name = f"{self.main_llm.__class__.__name__}_chat_completion"
-            with self.instrumentor.observe(session_id=session_id, user_id=user_id, trace_name=trace_name):
-                response_text = await self.main_llm.arun(messages=inal_messages)
-            self.instrumentor.flush()
+                his_sessions = await self.memory_store.get_user_sessions(
+                    user_id=user_id,
+                )
+                yield {'_type': 'sys_resp_cnt', 'text': str(sum([len(chat) for chat in his_sessions]))}
 
-            yield {'_type': 'header_thinking', 'text': 'Đang phân tích phản hổi...\n'}
+                try:
+                    response_text = await self._get_response(
+                        inal_messages=inal_messages,
+                        session_id=session_id,
+                        user_id=user_id,
+                        agent_name=self.bot_name
+                    )
 
-            from services import (
-                get_google_genai_llm,
-                get_settings_cached
-            )
-            google_llm = get_google_genai_llm(
-                model_name=get_settings_cached().GOOGLEAI_MODEL_EDITOR
-            )
-            response_permission_editor_response = await self.eval_agent.validate(
-                query=f"""question:\n{query_text}\n\question_context:\n{response_text}\n\nuser_context:\n{user_context.model_dump_json(exclude='role').lower()}""",
-                user_id=user_id,
-                session_id=session_id,
-                func=google_llm.arun, agent_name="response_permission_editor"
-            )
-            response_text = response_permission_editor_response.get("answer")
+                except Exception as e:
+                    await self._update_chat(
+                        chat_id=chat_id,
+                        response=str(e),
+                        retrieved_context=retrieved_context,
+                        start_time=start_time,
+                        status=ChatStatus.ERROR.value
+                    )
 
-            chat_id = str(uuid4())
-            chat_to_store = BaseChat(
-                message=query_text,
-                response=response_text,
-                context={
-                    "source_document_ids": [id_ for id_, _ in retrieved_context.source_documents.items()]
-                },
-                timestamp=datetime.now(),
-                chat_id=chat_id
-            )
+                    logger.error(f"VaHaCha - Error during response for session '{session_id}': {e}", exc_info=True)
+                    raise HTTPException(status_code=500, detail="Error during response")
 
-            session_title = await self.memory_store.add_chat(
-                user_id=user_id,
-                session_id=session_id,
-                chat=chat_to_store,
-                llm=self.google_llm
-            )
+                yield {'_type': 'response', 'text': response_text}
 
-
-            yield {'_type': 'response', 'text': response_text}
-
-            if session_title:
-                yield {'_type': 'session_title', 'text': session_title}
-            yield {'_type': 'chat_id', 'text': chat_id}
+                try:
+                    await self._update_chat(
+                        chat_id=chat_id,
+                        response=response_text,
+                        retrieved_context=retrieved_context,
+                        start_time=start_time,
+                        status=ChatStatus.FINISHED.value
+                    )
+                except Exception as e:
+                    logger.error(f"VaHaCha - Error during update_chat for session '{session_id}': {e}", exc_info=True)
+                    raise HTTPException(status_code=500, detail="Error during update_chat")
 
         except HTTPException as http_exc:
             raise http_exc
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"An internal error occurred during chat processing. {e}")
+            logger.error(f"VaHaCha - An internal error occurred during chat processing: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"VaHaCha - An internal error occurred during chat processing. {e}")

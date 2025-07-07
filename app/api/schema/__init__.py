@@ -4,7 +4,7 @@ from .base import BaseResponse
 
 from .file import FileResponse
 
-from .master_data import MasterData, MasterDataInput, MasterDataResponse
+from .master_data import MasterData, MasterDataInput, MasterDataResponse, UserInfo
 
 from .sessions import SessionResponse, SessionResult, SessionRatingResponse, SessionRatingResult
 
@@ -24,6 +24,7 @@ __all__ = [
     'MasterData',
     'MasterDataInput',
     'MasterDataResponse',
+    'UserInfo'
 
     'SessionResponse',
     'SessionResult',

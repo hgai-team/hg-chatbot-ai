@@ -8,8 +8,7 @@ from zoneinfo import ZoneInfo
 from .handlers.chat import (
     ops_chat,
     ops_chat_stream,
-    ops_chat_user,
-    ops_chat_user_stream
+    ops_chat_user_stream,
 )
 
 from .handlers.files import (
@@ -56,30 +55,17 @@ class OpsBotManager(BaseManager):
         ):
             yield chunk
 
-    async def chat_user(
-        self,
-        chat_request: ChatRequest,
-        user_context: UserContext = None
-    ):
-        return await ops_chat_user(
-            chat_service=self.ops_bot,
-            query_text=chat_request.query_text,
-            user_id=chat_request.user_id,
-            session_id=chat_request.session_id,
-            user_context=user_context
-        )
-
     async def chat_user_stream(
         self,
         chat_request: ChatRequest,
-        user_context: UserContext = None
+        email: str,
     ):
         async for chunk in ops_chat_user_stream(
             chat_service=self.ops_bot,
             query_text=chat_request.query_text,
             user_id=chat_request.user_id,
             session_id=chat_request.session_id,
-            user_context=user_context
+            email=email
         ):
             yield chunk
 

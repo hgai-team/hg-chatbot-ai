@@ -9,7 +9,7 @@ from api.routers import (
 )
 
 from api.security import validate_auth
-from api.schema import MasterData
+from api.schema import MasterData, UserInfo
 from core.storages.client import PostgresEngineManager
 from core.storages.tracestores import TraceSpan, SpanCreate
 

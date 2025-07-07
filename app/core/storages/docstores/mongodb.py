@@ -1,6 +1,6 @@
 import json
 import asyncio
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict, Any
 
 from core.base import Document
 from core.config import get_core_settings
@@ -154,115 +154,81 @@ class MongoDBDocumentStore(BaseDocumentStore):
             for doc in docs
         ]
 
-    async def user_query(
-        self,
-        query: str,
-        top_k: int = 20,
-        doc_ids: Optional[list] = None,
-        user_context: Optional[dict] = None,
-    ):
-        """Search document store using text search query + context filters."""
-        try:
-            base_filters = [
-                {"$text": {"$search": query}}
-            ]
-            if doc_ids:
-                base_filters.append({"id": {"$in": doc_ids}})
+    async def find_docs_id_for_user(self, user_roles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Tìm kiếm id tài liệu dựa trên danh sách các vai trò (roles) của người dùng.
+        Hàm này bảo toàn mối liên kết giữa dự án/network và bộ quyền cụ thể của nó.
+        """
+        if not user_roles:
+            return []
 
-            context_or = []
-            if user_context:
-                projs = user_context.get("projects", [])
-                nets = user_context.get("networks", [])
-                deps = user_context.get("departments", [])
+        or_conditions = []
+        has_general_permission = False
 
-                context_or.append({
-                    "$and": [
-                        {"attributes.projects": {"$in": projs}},
-                        {"attributes.networks": {"$size": 0}},
-                        {"attributes.departments": {"$size": 0}}
-                    ],
-                })
+        # Định nghĩa các loại quy tắc để dễ dàng lặp qua
+        project_rules_keys = {
+            "quy_định_chung_dự_án", "file_xlcv_chung_dự_án",
+            "quy_định_riêng_dự_án_phòng_ban", "file_xlcv_riêng_dự_án_phòng_ban"
+        }
+        network_rules_keys = {
+            "quy_định_riêng_dự_án_net", "file_xlcv_riêng_dự_án_net", "quy_định_network"
+        }
 
-                context_or.append({
-                    "$and": [
-                        {"attributes.projects": {"$in": projs}},
-                        {"attributes.networks": {"$in": nets}},
-                        {"attributes.departments": {"$size": 0}}
-                    ],
-                })
+        for role in user_roles:
+            metadata = role.get("metadata_", {})
+            if not metadata:
+                continue
 
-                context_or.append({
-                    "$and": [
-                        {"attributes.projects": {"$in": projs}},
-                        {"attributes.networks": {"$in": nets}},
-                        {"attributes.departments": {"$in": deps}}
-                    ],
-                })
+            # Xử lý quyền chung (chỉ cần kiểm tra một lần)
+            if metadata.get("quy_định_chung"):
+                has_general_permission = True
 
-                context_or.append({
-                    "$and": [
-                        {"attributes.projects": {"$size": 0}},
-                        {"attributes.networks": {"$in": nets}},
-                        {"attributes.departments": {"$in": deps}}
-                    ],
-                })
+            # Xử lý các quy tắc gắn với dự án
+            project_name = role.get("project")
+            if project_name:
+                for key in project_rules_keys:
+                    if metadata.get(key):
+                        condition = {
+                            f"attributes.{key}": True,
+                            "attributes.tên dự án": project_name
+                        }
+                        or_conditions.append(condition)
 
-                context_or.append({
-                    "$and": [
-                        {"attributes.projects": {"$size": 0}},
-                        {"attributes.networks": {"$in": nets}},
-                        {"attributes.departments": {"$size": 0}}
-                    ],
-                })
+            # Xử lý các quy tắc gắn với network
+            role_networks = [net for net in [role.get("network_in_qlk"), role.get("network_in_ys")] if net]
+            if role_networks:
+                for key in network_rules_keys:
+                    if metadata.get(key):
+                        condition = {
+                            f"attributes.{key}": True,
+                            "attributes.tên network": {"$in": role_networks}
+                        }
+                        or_conditions.append(condition)
 
-                context_or.append({
-                    "$and": [
-                        {"attributes.projects": {"$size": 0}},
-                        {"attributes.networks": {"$size": 0}},
-                        {"attributes.departments": {"$in": deps}}
-                    ],
-                })
+        # Thêm điều kiện chung vào cuối cùng nếu có
+        if has_general_permission:
+            # Để tránh trùng lặp, có thể kiểm tra nếu đã tồn tại
+            general_condition = {"attributes.quy_định_chung": True}
+            if general_condition not in or_conditions:
+                or_conditions.append(general_condition)
 
-            context_or.append({
-                "$and": [
-                    {"attributes.general": True},
-                    {"attributes.projects": {"$size": 0}},
-                    {"attributes.networks": {"$size": 0}},
-                    {"attributes.departments": {"$size": 0}}
-                ]
-            })
+        or_conditions.append(
+            {"attributes.file_name": "Hệ thống nhân sự Vận hành.xlsx"}
+        )
 
-            if context_or:
-                find_filter = {
-                    "$and": [
-                        {"$and": base_filters},
-                        {"$or": context_or}
-                    ]
-                }
-            else:
-                find_filter = {"$and": base_filters}
+        if not or_conditions:
+            return []
 
-            cursor = (
-                self.collection
-                    .find(find_filter, {"score": {"$meta": "textScore"}})
-                    .sort([("score", {"$meta": "textScore"})])
-                    .limit(top_k)
-            )
+        final_filter = {"$or": or_conditions}
 
-            docs = await cursor.to_list(length=top_k)
+        cursor = self.collection.find(final_filter)
+        seen_ids = set()
 
-        except Exception as e:
-            print(f"Error querying MongoDB: {e}")
-            docs = []
+        for doc in [doc async for doc in cursor]:
+            if doc['id'] not in seen_ids:
+                seen_ids.add(doc["id"])
 
-        return [
-            Document(
-                id_=doc["id"],
-                text=doc.get("text", "<empty>"),
-                metadata=doc.get("attributes", {}),
-            )
-            for doc in docs
-        ]
+        return list(seen_ids)
 
     async def get(self, ids: Union[List[str], str]) -> List[Document]:
         """Get document by id"""

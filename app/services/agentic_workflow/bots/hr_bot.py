@@ -229,7 +229,6 @@ class HrBotService(BaseBotService):
 
         return response.message.content
 
-
     async def process_chat_request(
         self,
         query_text: str,

@@ -42,7 +42,7 @@ class MSMarcoReranker(BaseReranker):
         scores: List[float] = [float(s) for s in raw_scores]
 
         ranked: List[Tuple[str, float]] = sorted(
-            filter(lambda x: x[1] > 1, zip(docs, scores)),
+            zip(docs, scores),
             key=lambda x: x[1],
             reverse=True
         )

@@ -33,6 +33,30 @@ from services import get_settings_cached, get_google_genai_llm
 DEFAULT_SAVE_PATH = Path("./data")
 CONCURRENT_LIMIT = 7
 
+EXTRA_INFO_INCLUDE = [
+    'tên network',
+    'tên dự án',
+    'quy_định_chung',
+    'quy_định_chung_dự_án',
+    'file_xlcv_chung_dự_án',
+    'quy_định_riêng_dự_án_phòng_ban',
+    'file_xlcv_riêng_dự_án_phòng_ban',
+    'quy_định_riêng_dự_án_net',
+    'file_xlcv_riêng_dự_án_net',
+    'quy_định_network'
+]
+
+TEXT_EXCLUDE = [
+    'quy_định_chung',
+    'quy_định_chung_dự_án',
+    'file_xlcv_chung_dự_án',
+    'quy_định_riêng_dự_án_phòng_ban',
+    'file_xlcv_riêng_dự_án_phòng_ban',
+    'quy_định_riêng_dự_án_net',
+    'file_xlcv_riêng_dự_án_net',
+    'quy_định_network'
+]
+
 class FileProcessorTool:
     def __init__(
         self,
@@ -148,7 +172,6 @@ class FileProcessorTool:
 
         return None
 
-
     async def ops_bot_get_context_data(
         self
     ):
@@ -205,6 +228,8 @@ class FileProcessorTool:
         file: UploadFile,
         use_pandas=False,
         use_type=True,
+        extra_info_include=EXTRA_INFO_INCLUDE,
+        text_exclude=TEXT_EXCLUDE
     ):
         file_name, file_stream = await parse_file(file)
 
@@ -221,7 +246,9 @@ class FileProcessorTool:
         docs = reader.load_data(
             file=file_stream,
             sheet_name=get_visible_sheets(file_stream),
-            extra_info={"file_name": file_name}
+            extra_info={"file_name": file_name},
+            extra_info_include=extra_info_include,
+            text_exclude=text_exclude
         )
 
         if use_type and docs:

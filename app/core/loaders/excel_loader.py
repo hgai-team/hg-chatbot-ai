@@ -161,6 +161,8 @@ class ExcelReader(BaseReader):
         include_sheetname: bool = True,
         sheet_name: Optional[Union[str, int, list]] = None,
         extra_info: Optional[dict] = None,
+        text_exclude: Optional[list] = [],
+        extra_info_include: Optional[list] = [],
         **kwargs,
     ) -> List[Document]:
         """Parse file and extract values from a specific column.
@@ -260,8 +262,18 @@ class ExcelReader(BaseReader):
 
             for idx, row in enumerate(data_rows):
                 content = ''
+                to_extra_info = {}
                 for cell_idx, cell_text in enumerate(row):
-                    if cell_text:
+                    if headers[cell_idx].lower() in extra_info_include:
+                        if not cell_text:
+                            text = False
+                        if cell_text == '1':
+                            text = True
+                        elif cell_text:
+                            text = cell_text
+                        to_extra_info[headers[cell_idx].lower()] = text.lower() if isinstance(text, str) else text
+                        continue
+                    if cell_text and headers[cell_idx].lower() not in text_exclude:
                         content += f"""{headers[cell_idx]}:{self._row_joiner}{cell_text}{self._row_joiner}{self._row_joiner}"""
 
                 if include_sheetname:
@@ -271,7 +283,8 @@ class ExcelReader(BaseReader):
                     "sheet_name": sheet_name,
                     "idx": idx,
                     "uploaded_at": datetime.now(),
-                    **extra_info
+                    **extra_info,
+                    **to_extra_info
                 }
 
                 if content.strip():

@@ -41,25 +41,6 @@ class QueryAnalyzerAgentTool:
         fallback: Callable[[Union[str, List[str]]], Any]
     ) -> Any:
         agent_config = self._get_agent_config(agent_name)
-        # try:
-        #     with self.instrumentor.observe(
-        #         session_id=session_id,
-        #         user_id=user_id,
-        #         trace_name=f"{func.__name__}_{agent_name}"
-        #     ):
-        #         prompt = PPT.apply_chat_template(
-        #             template=self.prompt_template,
-        #             **{**agent_config, **{"input": input_data}}
-        #         )
-        #         messages = PPT.prepare_chat_messages(prompt=prompt)
-        #         response = await func(messages)
-
-        #     await asyncio.to_thread(self.instrumentor.flush)
-
-        #     return json_parser(response)
-
-        # except Exception:
-        #     return fallback(input_data)
 
         try:
             async with TM.trace_span(

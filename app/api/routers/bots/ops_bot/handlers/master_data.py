@@ -2,8 +2,10 @@ from uuid import uuid4
 from sqlmodel import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.schema import MasterData, MasterDataInput
+from api.schema import MasterData, MasterDataInput, UserInfo
 from core.storages.client import PostgresEngineManager as PEM
+
+from typing import List
 
 async def create_master_data(
     input_: MasterDataInput,
@@ -55,3 +57,25 @@ async def get_all_master_data_type(
             select(MasterData).where(MasterData.type == type)
         )
         return result.all()
+
+async def create_user_info(
+    input_: List[UserInfo],
+):
+    async with PEM.get_session() as session:
+        session.add_all(input_)
+
+async def get_all_user_info():
+    async with PEM.get_session() as session:
+        result = await session.exec(select(UserInfo))
+        return result.all()     
+    
+async def get_user_info(
+    email: str
+):
+    async with PEM.get_session() as session:
+        result = await session.exec(
+            select(UserInfo).where(
+                UserInfo.email==email
+            )
+        )
+        return result.all()     
