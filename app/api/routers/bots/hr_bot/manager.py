@@ -4,7 +4,10 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 from fastapi import UploadFile, HTTPException, status
+from google import genai
+from google.genai import types
 
+from services import get_settings_cached
 from services.agentic_workflow.bots.hr_bot import HrBotService
 from api.routers.bots.base import BaseManager
 from api.schema import (
@@ -25,7 +28,7 @@ from .handlers.files import (
 
 from .handlers.traces import (
     hr_get_all_traces
-) 
+)
 
 
 class HrBotManager(BaseManager):
@@ -33,6 +36,9 @@ class HrBotManager(BaseManager):
         self,
     ):
         self.hr_bot = HrBotService()
+        self.client = genai.Client(
+            api_key=get_settings_cached().GOOGLEAI_API_KEY
+        )
 
     # Chat
     async def chat_stop(
@@ -116,6 +122,36 @@ class HrBotManager(BaseManager):
             chat_id=chat_id,
             rating_type=rating_type,
             rating_text=rating_text
+        )
+
+    async def count_tokens(
+        self,
+        session_id: str
+    ):
+        sesstion_his = await self.hr_bot.memory_store.get_session_history(
+            session_id=session_id
+        )
+
+        his_ctx = []
+        for his in sesstion_his:
+            his_ctx.append(
+                types.Content(
+                    role="user", parts=[types.Part(text=his["message"])]
+                )
+            )
+            his_ctx.append(
+                types.Content(
+                    role="model", parts=[types.Part(text=his["response"])]
+                )
+            )
+
+        chat = self.client.chats.create(
+            model=get_settings_cached().GOOGLEAI_MODEL_THINKING,
+            history=his_ctx,
+        )
+
+        return self.client.models.count_tokens(
+            model=get_settings_cached().GOOGLEAI_MODEL_THINKING, contents=chat.get_history()
         )
 
     # Logs
