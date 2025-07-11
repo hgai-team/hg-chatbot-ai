@@ -164,7 +164,7 @@ class OpsBotManager(BaseManager):
             contents = contents + extra_content
         
         if not contents:
-            {
+            return {
                 "totalTokens": 0,
                 "cachedContentTokenCount": None
             }
