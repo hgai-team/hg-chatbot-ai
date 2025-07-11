@@ -97,7 +97,7 @@ class GenBotManager(BaseManager):
             extra_content = [types.Content(role="user", parts=[types.Part(text=message)])]
         
         contents = [
-            types.Content(role=role, parts=[types.Part(text=text)])
+            types.Content(role=role, parts=[types.Part(text=text if text else "")])
             for record in session_his.history
             for role, text in (("user", record["message"]), ("model", record["response"]))
         ]
