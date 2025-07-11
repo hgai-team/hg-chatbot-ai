@@ -402,8 +402,8 @@ async def add_rating(
     tags=['Sessions']
 )
 async def count_tokens(
-    session_id: str,
-    message: str,
+    session_id: str = Body(..., embed=True),
+    message: str = Body(..., embed=True),
     bot_name: str = Path(...),
 ):
     bot_manager: BaseManager = get_bot_manager(bot_name)
