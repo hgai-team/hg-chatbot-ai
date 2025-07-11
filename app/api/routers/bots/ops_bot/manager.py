@@ -149,12 +149,25 @@ class OpsBotManager(BaseManager):
         session_his = await self.ops_bot.memory_store.get_session_history(
             session_id=session_id
         )
-
+        
+        extra_content = []
+        if message:
+            extra_content = [types.Content(role="user", parts=[types.Part(text=message)])]
+        
         contents = [
             types.Content(role=role, parts=[types.Part(text=text)])
             for record in session_his.history
             for role, text in (("user", record["message"]), ("model", record["response"]))
-        ] + [types.Content(role="user", parts=[types.Part(text=message)])]
+        ]
+        
+        if extra_content:
+            contents = contents + extra_content
+        
+        if not contents:
+            {
+                "totalTokens": 0,
+                "cachedContentTokenCount": None
+            }
 
         return self.client.models.count_tokens(
             model=get_settings_cached().GOOGLEAI_MODEL_THINKING,
