@@ -79,3 +79,21 @@ async def get_user_info(
             )
         )
         return result.all()     
+    
+async def aggregated_user_info(
+    email: str
+):
+    data = await get_user_info(email=email)
+
+    fields = ['network_in_ys', 'department', 'network_in_qlk', 'project']
+
+    aggregated = {
+        field: list({
+            getattr(user, field)
+            for user in data
+            if getattr(user, field) is not None
+        })
+        for field in fields
+    }
+        
+    return aggregated

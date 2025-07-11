@@ -8,7 +8,7 @@ from datetime import datetime
 from fastapi import HTTPException
 from uuid import uuid4
 
-from llama_index.core.llms import ChatResponse
+from llama_index.core.llms import ChatMessage, ChatResponse
 
 from typing import List, Dict, Any, Callable
 
@@ -354,7 +354,8 @@ class OpsBotService(BaseBotService):
         query_text: str,
         user_id: str,
         session_id: str,
-        user_roles: list[dict]
+        user_roles: list[dict],
+        aggregated_info: dict
     ):
         start_time = timeit.default_timer()
 
@@ -441,6 +442,9 @@ class OpsBotService(BaseBotService):
                     user_id=user_id,
                 )
                 yield {'_type': 'sys_resp_cnt', 'text': str(sum([len(chat) for chat in his_sessions]))}
+
+                message: ChatMessage = inal_messages[0]
+                message.content = message.content.format(user_info=aggregated_info)
 
                 try:
                     response_text = await self._get_response(

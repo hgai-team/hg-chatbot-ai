@@ -17,7 +17,8 @@ from .ops_bot.handlers.master_data import (
     get_all_master_data_type,
     create_user_info,
     get_all_user_info,
-    get_user_info
+    get_user_info,
+    aggregated_user_info
 )
 
 
@@ -196,6 +197,20 @@ async def get_user(
     email: str
 ):
     data = await get_user_info(email=email)
+
+    return {
+        "status": 200,
+        "data": data
+    }
+
+@app.get(
+    "/user-info/aggregated",
+    dependencies=[Depends(validate_auth)],
+)
+async def get_aggregated_user_info(
+    email: str
+):
+    data = await aggregated_user_info(email=email)
 
     return {
         "status": 200,
