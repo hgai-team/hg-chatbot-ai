@@ -5,6 +5,9 @@ from zoneinfo import ZoneInfo
 
 from fastapi import UploadFile, HTTPException, status
 
+from google import genai
+from google.genai import types
+
 from services.agentic_workflow.bots.gen_bot import GenBotService
 from services.agentic_workflow.tools import PromptProcessorTool as PPT
 from services import get_settings_cached
@@ -26,6 +29,9 @@ class GenBotManager(BaseManager):
         self,
     ):
         self.gen_bot = GenBotService()
+        self.client = genai.Client(
+            api_key=get_settings_cached().GOOGLEAI_API_KEY
+        )
 
     # Chat
     async def chat_stop(
@@ -75,6 +81,25 @@ class GenBotManager(BaseManager):
             chat_id=chat_id,
             rating_type=rating_type,
             rating_text=rating_text
+        )
+
+    async def count_tokens(
+        self,
+        session_id: str
+    ):
+        session_his = await self.gen_bot.memory_store.get_session_history(
+            session_id=session_id
+        )
+
+        contents = [
+            types.Content(role=role, parts=[types.Part(text=text)])
+            for record in session_his.history
+            for role, text in (("user", record["message"]), ("model", record["response"]))
+        ]
+
+        return self.client.models.count_tokens(
+            model=get_settings_cached().GOOGLEAI_MODEL_THINKING,
+            contents=contents
         )
 
     # Logs

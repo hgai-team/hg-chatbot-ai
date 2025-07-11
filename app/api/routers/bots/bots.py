@@ -398,7 +398,7 @@ async def add_rating(
 @app.post(
     "/{bot_name}/sessions/count-tokens",
     dependencies=[Depends(validate_auth)],
-    response_model=SessionRatingResponse,
+    response_model=BaseResponse,
     tags=['Sessions']
 )
 async def count_tokens(
@@ -411,11 +411,9 @@ async def count_tokens(
         response = await bot_manager.count_tokens(
             session_id=session_id,
         )
-        return SessionRatingResponse(
+        return BaseResponse(
             status=200,
-            data={
-                "count_tokens": response,
-            }
+            data=response
         )
     except AttributeError as e:
         logger.error(f"Attribute error in count_tokens for bot '{bot_name}': {e}", exc_info=True)

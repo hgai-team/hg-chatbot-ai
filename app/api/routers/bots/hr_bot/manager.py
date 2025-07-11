@@ -128,30 +128,19 @@ class HrBotManager(BaseManager):
         self,
         session_id: str
     ):
-        sesstion_his = await self.hr_bot.memory_store.get_session_history(
+        session_his = await self.hr_bot.memory_store.get_session_history(
             session_id=session_id
         )
 
-        his_ctx = []
-        for his in sesstion_his:
-            his_ctx.append(
-                types.Content(
-                    role="user", parts=[types.Part(text=his["message"])]
-                )
-            )
-            his_ctx.append(
-                types.Content(
-                    role="model", parts=[types.Part(text=his["response"])]
-                )
-            )
-
-        chat = self.client.chats.create(
-            model=get_settings_cached().GOOGLEAI_MODEL_THINKING,
-            history=his_ctx,
-        )
+        contents = [
+            types.Content(role=role, parts=[types.Part(text=text)])
+            for record in session_his.history
+            for role, text in (("user", record["message"]), ("model", record["response"]))
+        ]
 
         return self.client.models.count_tokens(
-            model=get_settings_cached().GOOGLEAI_MODEL_THINKING, contents=chat.get_history()
+            model=get_settings_cached().GOOGLEAI_MODEL_THINKING,
+            contents=contents
         )
 
     # Logs

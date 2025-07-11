@@ -5,6 +5,9 @@ from fastapi import UploadFile, HTTPException, status
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
+from google import genai
+from google.genai import types
+
 from .handlers.chat import (
     ops_chat_stop,
     ops_chat,
@@ -18,7 +21,7 @@ from .handlers.files import (
     ops_upload_excel
 )
 
-
+from services import get_settings_cached
 from services.agentic_workflow.bots.ops_bot import OpsBotService
 from services.agentic_workflow.tools.prompt_processor import PromptProcessorTool as PPT
 from api.routers.bots.base import BaseManager
@@ -32,6 +35,9 @@ class OpsBotManager(BaseManager):
         self,
     ):
         self.ops_bot = OpsBotService()
+        self.client = genai.Client(
+            api_key=get_settings_cached().GOOGLEAI_API_KEY
+        )
 
     # Chat
     async def chat_stop(
@@ -133,6 +139,25 @@ class OpsBotManager(BaseManager):
             chat_id=chat_id,
             rating_type=rating_type,
             rating_text=rating_text
+        )
+
+    async def count_tokens(
+        self,
+        session_id: str
+    ):
+        session_his = await self.ops_bot.memory_store.get_session_history(
+            session_id=session_id
+        )
+
+        contents = [
+            types.Content(role=role, parts=[types.Part(text=text)])
+            for record in session_his.history
+            for role, text in (("user", record["message"]), ("model", record["response"]))
+        ]
+
+        return self.client.models.count_tokens(
+            model=get_settings_cached().GOOGLEAI_MODEL_THINKING,
+            contents=contents
         )
 
     # Logs
