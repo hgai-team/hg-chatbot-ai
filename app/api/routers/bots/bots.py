@@ -403,6 +403,7 @@ async def add_rating(
 )
 async def count_tokens(
     session_id: str,
+    message: str,
     bot_name: str = Path(...),
 ):
     bot_manager: BaseManager = get_bot_manager(bot_name)
@@ -410,6 +411,7 @@ async def count_tokens(
     try:
         response = await bot_manager.count_tokens(
             session_id=session_id,
+            message=message
         )
         return BaseResponse(
             status=200,

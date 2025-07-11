@@ -126,7 +126,8 @@ class HrBotManager(BaseManager):
 
     async def count_tokens(
         self,
-        session_id: str
+        session_id: str,
+        message: str
     ):
         session_his = await self.hr_bot.memory_store.get_session_history(
             session_id=session_id
@@ -136,7 +137,7 @@ class HrBotManager(BaseManager):
             types.Content(role=role, parts=[types.Part(text=text)])
             for record in session_his.history
             for role, text in (("user", record["message"]), ("model", record["response"]))
-        ]
+        ] + [types.Content(role="user", parts=[types.Part(text=message)])]
 
         return self.client.models.count_tokens(
             model=get_settings_cached().GOOGLEAI_MODEL_THINKING,
