@@ -210,6 +210,11 @@ class GenBotService(BaseBotService):
 
             choosed_tool = await self._choose_tool(query_text=query_text, initial_messages=initial_messages)
 
+            his_sessions = await self.memory_store.get_user_sessions(
+                    user_id=user_id,
+                )
+            yield {'_type': 'sys_resp_cnt', 'text': str(sum([len(chat) for chat in his_sessions]))}
+
             if isinstance(choosed_tool, str):
                 await self._update_chat(
                     chat_id=chat_id,

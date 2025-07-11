@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 from .handlers.chat import (
+    ops_chat_stop,
     ops_chat,
     ops_chat_stream,
     ops_chat_user_stream,
@@ -31,6 +32,16 @@ class OpsBotManager(BaseManager):
         self,
     ):
         self.ops_bot = OpsBotService()
+
+    # Chat
+    async def chat_stop(
+        self,
+        chat_id: str,
+    ):
+        await ops_chat_stop(
+            bot_service=self.ops_bot,
+            chat_id=chat_id,
+        )
 
     async def chat(
         self,
@@ -69,6 +80,7 @@ class OpsBotManager(BaseManager):
         ):
             yield chunk
 
+    # File
     async def get_files_metadata(
         self,
     ):
@@ -101,6 +113,7 @@ class OpsBotManager(BaseManager):
         )
         return response
 
+    # Session
     async def get_session(
         self,
         session_id: str
@@ -122,6 +135,7 @@ class OpsBotManager(BaseManager):
             rating_text=rating_text
         )
 
+    # Logs
     async def get_logs(
         self,
         page_index: int,
@@ -253,3 +267,12 @@ class OpsBotManager(BaseManager):
         )
 
         return response
+
+    async def get_user_sys_resp_cnt(
+        self,
+        user_id: str
+    ):
+        his_sessions = await self.ops_bot.memory_store.get_user_sessions(
+            user_id=user_id,
+        )
+        return sum([len(chat) for chat in his_sessions])

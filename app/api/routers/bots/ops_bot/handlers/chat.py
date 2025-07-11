@@ -20,6 +20,14 @@ async def yield_data(
         }
     """
 
+async def ops_chat_stop(
+    bot_service: OpsBotService,
+    chat_id: str,
+):
+    await bot_service.memory_store.update_chat_status(
+        chat_id=chat_id
+    )
+
 async def ops_chat(
     chat_service: OpsBotService,
     query_text: str,

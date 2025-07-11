@@ -5,8 +5,6 @@ from zoneinfo import ZoneInfo
 
 from fastapi import UploadFile, HTTPException, status
 
-
-
 from services.agentic_workflow.bots.gen_bot import GenBotService
 from services.agentic_workflow.tools import PromptProcessorTool as PPT
 from services import get_settings_cached
@@ -17,19 +15,10 @@ from api.schema import (
 )
 
 from .handlers.chat import (
+    gen_chat_stop,
     gen_chat,
     gen_chat_stream
 )
-
-# from .handlers.files import (
-#     hr_get_files_metadata,
-#     hr_delete_file,
-#     hr_ocr_pdf_to_md
-# )
-
-# from .handlers.traces import (
-#     hr_get_all_traces
-# )
 
 
 class GenBotManager(BaseManager):
@@ -37,6 +26,16 @@ class GenBotManager(BaseManager):
         self,
     ):
         self.gen_bot = GenBotService()
+
+    # Chat
+    async def chat_stop(
+        self,
+        chat_id: str,
+    ):
+        await gen_chat_stop(
+            bot_service=self.gen_bot,
+            chat_id=chat_id,
+        )
 
     async def chat(
         self,
@@ -56,6 +55,7 @@ class GenBotManager(BaseManager):
         ):
             yield chunk
 
+    # Session
     async def get_session(
         self,
         session_id: str
@@ -77,6 +77,7 @@ class GenBotManager(BaseManager):
             rating_text=rating_text
         )
 
+    # Logs
     async def get_logs(
         self,
         page_index: int,
@@ -134,4 +135,58 @@ class GenBotManager(BaseManager):
                 detail=f"Error processing logs: {str(e)}"
             )
 
+    async def get_logs_file(
+        self,
+    ):
+        results = []
+        logs = await self.gen_bot.memory_store.get_logs()
+        try:
+            if len(logs) == 0:
+                return [], {'page_number': 0, 'total_items': 0}
 
+
+            for log in logs:
+                for history in log.history:
+                    ts_bkk_naive = (
+                        history["timestamp"]
+                        .replace(tzinfo=timezone.utc)
+                        .astimezone(ZoneInfo("Asia/Bangkok"))
+                        .replace(tzinfo=None)
+                    )
+
+                    results.append({
+                        "user_id": log.user_id,
+                        "session_id": log.session_id,
+                        "message": history["message"],
+                        "response": history["response"],
+                        "timestamp": ts_bkk_naive,
+                        "chat_id": history["chat_id"],
+                        "rating_type": history["rating_type"],
+                        "rating_text": history["rating_text"]
+                    })
+
+            df = pd.DataFrame(results)
+
+            file = io.BytesIO()
+            with pd.ExcelWriter(file, engine='openpyxl') as writer:
+                ts = datetime.now(ZoneInfo("Asia/Bangkok")).strftime("%Y%m%d_%H%M")
+                sheet_name = f"history_{ts}"[:31]
+                df.to_excel(writer, index=False, sheet_name=sheet_name)
+            file.seek(0)
+
+            return file, ts
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error processing logs: {str(e)}"
+            )
+
+    async def get_user_sys_resp_cnt(
+        self,
+        user_id: str
+    ):
+        his_sessions = await self.gen_bot.memory_store.get_user_sessions(
+            user_id=user_id,
+        )
+        return sum([len(chat) for chat in his_sessions])

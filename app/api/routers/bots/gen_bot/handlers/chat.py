@@ -24,6 +24,14 @@ async def yield_data(
         }
     """
 
+async def gen_chat_stop(
+    bot_service: GenBotService,
+    chat_id: str,
+):
+    await bot_service.memory_store.update_chat_status(
+        chat_id=chat_id
+    )
+
 async def gen_chat(
     bot_service: GenBotService,
     query_text: str,
