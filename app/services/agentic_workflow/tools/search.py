@@ -83,7 +83,7 @@ class SearchTool:
             results = self.qdrant_vector_store.query(
                 embedding=embedding,
                 top_k=top_k,
-                ids=ids
+                ids=ids if ids else [0]
             )
             return results
         except Exception as e:
@@ -106,7 +106,8 @@ class SearchTool:
             docs_mongo, scores_mongo = await self.mongodb_doc_store.query(query=query_string, top_k=top_k, doc_ids=ids)
             mongodb_scored_docs = self.format_results(docs_mongo, scores_mongo)
 
-            all_docs: List[Document] = await self.mongodb_doc_store.get_all()
+            all_docs: List[Document] = await self.mongodb_doc_store.get(ids=ids)
+            scored_docs_manual = []
             if all_docs:
                 loop = asyncio.get_running_loop()
                 with concurrent.futures.ThreadPoolExecutor(min(16, os.cpu_count() + 4)) as executor:
@@ -123,7 +124,6 @@ class SearchTool:
 
                     scored_results_manual = await asyncio.gather(*tasks, return_exceptions=True)
 
-                scored_docs_manual = []
                 for result in scored_results_manual:
                     if isinstance(result, Exception):
                         print(f"Error during manual scoring task: {result}")

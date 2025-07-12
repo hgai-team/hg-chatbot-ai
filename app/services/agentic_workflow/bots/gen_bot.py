@@ -210,6 +210,9 @@ class GenBotService(BaseBotService):
 
             choosed_tool = await self._choose_tool(query_text=query_text, initial_messages=initial_messages)
 
+            # print("choosed_tool ==============")
+            # print(choosed_tool)
+            # print("==============")
             his_sessions = await self.memory_store.get_user_sessions(
                     user_id=user_id,
                 )

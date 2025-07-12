@@ -139,18 +139,22 @@ class OpsBotService(BaseBotService):
         session_id: str,
         agent_name: str,
     ) -> Any:
-        async with TM.trace_span(
-            span_name=f"{self.main_llm.__class__.__name__}_chat_completion",
-            span_type="LLM_AGENT_CALL",
-            custom_metadata={
-                "user_id": user_id,
-                "session_id": session_id,
-                "agent_name": agent_name,
-            }
-        ) as (trace_id, span_id, wrapper):
-            response: ChatResponse = await wrapper(self.main_llm.arun, messages=inal_messages)
+        try:
+            async with TM.trace_span(
+                span_name=f"{self.main_llm.__class__.__name__}_chat_completion",
+                span_type="LLM_AGENT_CALL",
+                custom_metadata={
+                    "user_id": user_id,
+                    "session_id": session_id,
+                    "agent_name": agent_name,
+                }
+            ) as (trace_id, span_id, wrapper):
+                response: ChatResponse = await wrapper(self.main_llm.arun, messages=inal_messages)
 
-        return response.message.content
+            return response.message.content
+        except Exception as e:
+            raise HTTPException(status_code=500, detail="Error during _get_response")
+
 
     async def process_chat_request(
         self,
@@ -400,25 +404,27 @@ class OpsBotService(BaseBotService):
                 raise HTTPException(status_code=500, detail="Error during context retrieval")
 
             ids = list(retrieved_context.source_documents.keys())
-            retrieved_docs = await self.file_processor.mongodb_doc_store.get(ids)
-            docs = [
-                {
-                    'id': doc.id_,
-                    'text': doc.get_content(),
-                    'metadata': doc.metadata
-                }
-                for doc in retrieved_docs
-            ]
 
-            reranked_res = await MSMarcoReranker.rerank(query_text, docs)
-            reranked_docs = [res[0] for res in reranked_res]
+            if ids:
+                retrieved_docs = await self.file_processor.mongodb_doc_store.get(ids)
+                docs = [
+                    {
+                        'id': doc.id_,
+                        'text': doc.get_content(),
+                        'metadata': doc.metadata
+                    }
+                    for doc in retrieved_docs
+                ]
 
-            documents_as_markdown = []
-            for i, doc in enumerate(reranked_docs, 1):
-                doc_str = f"### Tài liệu {i}\n\n{doc['text']}"
-                documents_as_markdown.append(doc_str)
+                reranked_res = await MSMarcoReranker.rerank(query_text, docs)
+                reranked_docs = [res[0] for res in reranked_res]
 
-            retrieved_context.context_string = "\n\n---\n\n".join(documents_as_markdown)
+                documents_as_markdown = []
+                for i, doc in enumerate(reranked_docs, 1):
+                    doc_str = f"### Tài liệu {i}\n\n{doc['text']}"
+                    documents_as_markdown.append(doc_str)
+
+                retrieved_context.context_string = "\n\n---\n\n".join(documents_as_markdown)
 
             yield {'_type': 'thinking', 'text': 'Hoàn thành tìm kiếm thông tin!\n'}
 

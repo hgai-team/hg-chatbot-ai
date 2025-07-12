@@ -132,20 +132,20 @@ class HrBotManager(BaseManager):
         session_his = await self.hr_bot.memory_store.get_session_history(
             session_id=session_id
         )
-        
+
         extra_content = []
         if message:
             extra_content = [types.Content(role="user", parts=[types.Part(text=message)])]
-        
+
         contents = [
             types.Content(role=role, parts=[types.Part(text=text if text else "")])
             for record in session_his.history
             for role, text in (("user", record["message"]), ("model", record["response"]))
         ]
-        
+
         if extra_content:
             contents = contents + extra_content
-        
+
         if not contents:
             return {
                 "totalTokens": 0,
@@ -275,8 +275,5 @@ class HrBotManager(BaseManager):
     async def get_all_traces(
         self,
     ):
-        import json
         resp = await hr_get_all_traces()
-        from core.storages.tracestores import TraceSpan
-        item: TraceSpan = resp[-1]
-        return item.model_dump()
+        return resp[-10:]

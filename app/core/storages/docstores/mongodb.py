@@ -114,7 +114,7 @@ class MongoDBDocumentStore(BaseDocumentStore):
         """Search document store using text search query"""
         try:
             find_filter = {"$text": {"$search": query}}
-            if doc_ids:
+            if doc_ids is not None:
                 find_filter = {
                     "$and": [
                         {"id": {"$in": doc_ids}},
@@ -159,8 +159,6 @@ class MongoDBDocumentStore(BaseDocumentStore):
         Tìm kiếm id tài liệu dựa trên danh sách các vai trò (roles) của người dùng.
         Hàm này bảo toàn mối liên kết giữa dự án/network và bộ quyền cụ thể của nó.
         """
-        if not user_roles:
-            return []
 
         or_conditions = []
         has_general_permission = False

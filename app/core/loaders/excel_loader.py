@@ -272,7 +272,7 @@ class ExcelReader(BaseReader):
                         elif cell_text:
                             text = cell_text
                         to_extra_info[headers[cell_idx].lower()] = text.lower() if isinstance(text, str) else text
-                        continue
+                        
                     if cell_text and headers[cell_idx].lower() not in text_exclude:
                         content += f"""{headers[cell_idx]}:{self._row_joiner}{cell_text}{self._row_joiner}{self._row_joiner}"""
 
