@@ -2,7 +2,9 @@ from functools import lru_cache
 
 from core.config import get_core_settings
 from core.embeddings import OpenAIEmbedding
-from core.llms import OpenAILLM, GoogleGenAILLM
+from core.llms import (
+    OpenAILLM, GoogleGenAILLM, XAILLM
+)
 from core.storages import (
     QdrantVectorStore,
     MongoDBMemoryStore,
@@ -126,6 +128,19 @@ def get_google_genai_llm(
         model_name = settings.GOOGLEAI_MODEL
 
     return GoogleGenAILLM(api_key=api_key, model_name=model_name)
+
+def get_xai_llm(
+    api_key: str = None,
+    model_name: str = None,
+):
+    settings = get_settings_cached()
+
+    if api_key is None:
+        api_key = settings.XAI_API_KEY
+    if model_name is None:
+        model_name = settings.XAI_MODEL_NAME
+
+    return XAILLM(api_key=api_key, model_name=model_name)
 
 @lru_cache
 def get_langfuse_instrumentor_cached():

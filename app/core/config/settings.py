@@ -14,6 +14,9 @@ class CoreSettings(BaseSettings):
     GOOGLEAI_MODEL_EDITOR: str
     GOOGLEAI_API_KEY: str
 
+    XAI_API_KEY: str
+    XAI_MODEL_NAME: str
+
     QDRANT_BASE_COLLECTION_NAME: str
     QDRANT_URL: str
     QDRANT_HOST: str
@@ -28,6 +31,7 @@ class CoreSettings(BaseSettings):
     OPS_AGENT_THINKING_PROMPT_PATH: str
     HR_AGENT_PROMPT_PATH: str
     HGGPT_AGENT_PROMPT_PATH: str
+    VIDMIND_AGENT_PROMPT_PATH: str
 
     SQL_DB_PATH: str
 

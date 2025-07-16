@@ -7,5 +7,5 @@ __all__ = [
     "OpsBotService",
     "HrBotService",
     "BaseBotService",
-    "GenBotService"
+    "GenBotService",
 ]

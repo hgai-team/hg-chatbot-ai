@@ -57,7 +57,11 @@ class GenBotManager(BaseManager):
             bot_service=self.gen_bot,
             query_text=chat_request.query_text,
             user_id=chat_request.user_id,
-            session_id=chat_request.session_id
+            session_id=chat_request.session_id,
+            start_time=chat_request.start_time,
+            end_time=chat_request.end_time,
+            fps=chat_request.fps,
+            selected_tool=chat_request.selected_tool
         ):
             yield chunk
 
@@ -91,20 +95,20 @@ class GenBotManager(BaseManager):
         session_his = await self.gen_bot.memory_store.get_session_history(
             session_id=session_id
         )
-        
+
         extra_content = []
         if message:
             extra_content = [types.Content(role="user", parts=[types.Part(text=message)])]
-        
+
         contents = [
             types.Content(role=role, parts=[types.Part(text=text if text else "")])
             for record in session_his.history
             for role, text in (("user", record["message"]), ("model", record["response"]))
         ]
-        
+
         if extra_content:
             contents = contents + extra_content
-        
+
         if not contents:
             return {
                 "totalTokens": 0,

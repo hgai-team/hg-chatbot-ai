@@ -39,7 +39,7 @@ class GenBotService(BaseBotService):
         )
 
         from services import (
-            get_google_genai_llm,
+            get_google_genai_llm, get_xai_llm,
             MongoDBMemoryStore, get_mongodb_memory_store,
         )
 
@@ -58,6 +58,10 @@ class GenBotService(BaseBotService):
             agent_prompt_path=self.agent_prompt_path,
             bot_name=self.bot_name
 
+        )
+
+        self.xai_llm = get_xai_llm(
+            model_name=settings.XAI_MODEL_NAME,
         )
 
         self.google_llm = get_google_genai_llm(
@@ -95,7 +99,7 @@ class GenBotService(BaseBotService):
                 llm=self.google_llm
             )
         except Exception as e:
-            logger.error(f"ChaChaCha - Failed to store chat history in _init_base_chat for session '{session_id}': {e}", exc_info=True)
+            logger.error(f"HGGPT - Failed to store chat history in _init_base_chat for session '{session_id}': {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Error during _init_base_chat")
 
         return chat_id, session_title
@@ -136,44 +140,6 @@ class GenBotService(BaseBotService):
 
         return response.message.content
 
-    async def _choose_tool(
-        self,
-        query_text: str,
-        initial_messages: list[ChatMessage]
-    ):
-        prompt_templates = PPT.load_prompt(get_settings_cached().BASE_PROMPT_PATH)
-        agent = prompt_templates['tool_selector_expert']
-
-        tools_schema_string = json.dumps( [tool.to_json_schema() for tool in TOOLS], indent=2, ensure_ascii=False)
-
-        messages = [
-            ChatMessage(
-                role=MessageRole.SYSTEM,
-                content=(
-                    f"{agent['role']}: {agent['description']}\n\n"
-                    f"## Hướng dẫn:\n{agent['instructions']}\n\n"
-                    "## Danh sách công cụ có sẵn (Tool Schemas):\n"
-                    f"Dưới đây là danh sách các công cụ bạn có thể sử dụng, được định dạng dưới dạng JSON. "
-                    f"Bạn phải tuân thủ nghiêm ngặt schema này, đặc biệt là tên công cụ (`name`) và tên các tham số trong `properties` để tạo output.\n\n"
-                    f"```json\n"
-                    f"{tools_schema_string}\n"
-                    f"```\n\n"
-                )
-            )
-        ] + initial_messages[1:] + [
-            ChatMessage(role=MessageRole.USER, content=f"## Đầu vào:\n{query_text}\n\n## Phản hồi:\n"),
-        ]
-
-        response: ChatResponse = await self.google_llm.arun(
-            messages=messages,
-        )
-
-        json_resp = json_parser(response.message.content)
-
-        if all(key in json_resp for key in ['status', 'response', 'raw_analysis']):
-            return response.message.content
-        return json_resp
-
     async def process_chat_request(
         self,
         query_text: str,
@@ -187,8 +153,12 @@ class GenBotService(BaseBotService):
         query_text: str,
         user_id: str,
         session_id: str,
+        start_time: str,
+        end_time: str,
+        fps: int,
+        selected_tool: str
     ) -> AsyncGenerator[str, None]:
-        start_time = timeit.default_timer()
+        start_time_chat = timeit.default_timer()
 
         chat_id, session_title = await self._init_base_chat(
             query_text=query_text,
@@ -204,42 +174,34 @@ class GenBotService(BaseBotService):
 
             initial_messages, _, _ = await self.query_processor._get_chat_history_and_prompt(user_id=user_id, session_id=session_id)
             message: ChatMessage = initial_messages[0]
-            message.content = message.content + self.hggpt_prompt['instruction'].format(
+            message.content = message.content + self.hggpt_prompt['instructions'].format(
                 TOOLS='\n'.join([f"- **{tool.name}**: {tool.description}" for tool in TOOLS])
             )
 
-            choosed_tool = await self._choose_tool(query_text=query_text, initial_messages=initial_messages)
-
-            # print("choosed_tool ==============")
-            # print(choosed_tool)
-            # print("==============")
             his_sessions = await self.memory_store.get_user_sessions(
                     user_id=user_id,
                 )
             yield {'_type': 'sys_resp_cnt', 'text': str(sum([len(chat) for chat in his_sessions]))}
 
-            if isinstance(choosed_tool, str):
-                await self._update_chat(
-                    chat_id=chat_id,
-                    response=choosed_tool,
+            if selected_tool and selected_tool in TOOL_FUNCTIONS:
+                response = ""
+                async for data in TOOL_FUNCTIONS[selected_tool](
+                    query_text=query_text,
+                    user_id=user_id,
+                    session_id=session_id,
                     start_time=start_time,
-                    status=ChatStatus.FINISHED.value
-                )
-                yield {'_type': 'response', 'text': choosed_tool}
-                return
-
-            if isinstance(choosed_tool, dict):
-                if choosed_tool['tool_name'] and choosed_tool['tool_name'] in TOOL_FUNCTIONS:
-                    response = None
-                    async for data in TOOL_FUNCTIONS[choosed_tool['tool_name']](**choosed_tool['tool_input']):
-                        if data['_type'] == 'response':
-                            response = data['text']
+                    end_time=end_time,
+                    fps=fps,
+                    initial_messages=initial_messages,
+                ):
+                    if data['_type'] == 'response':
+                        response += data['text']
                         yield data
 
                     await self._update_chat(
                         chat_id=chat_id,
                         response=response,
-                        start_time=start_time,
+                        start_time=start_time_chat,
                         status=ChatStatus.FINISHED.value
                     )
                     return
@@ -251,7 +213,7 @@ class GenBotService(BaseBotService):
             await self._update_chat(
                 chat_id=chat_id,
                 response=response.message.content,
-                start_time=start_time,
+                start_time=start_time_chat,
                 status=ChatStatus.FINISHED.value
             )
 
