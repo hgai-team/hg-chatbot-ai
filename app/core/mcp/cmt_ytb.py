@@ -254,6 +254,5 @@ async def comment_analyze(
                 analysis_aggregator_expert=analysis_aggregator_expert,
             ):
                 yield data
-            return
-
-    yield {'_type': 'response', 'text': response.choices[0].message.content}
+        else:
+            yield {'_type': 'response', 'text': response.choices[0].message.content}

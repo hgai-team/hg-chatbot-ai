@@ -2,6 +2,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 import asyncio
+import torch, gc
 
 from typing import List, Tuple, Optional
 from sentence_transformers import CrossEncoder
@@ -11,6 +12,8 @@ from .base import BaseReranker
 class MSMarcoReranker(BaseReranker):
     _model_name: str = 'cross-encoder/ms-marco-MiniLM-L6-v2'
     _model: Optional[CrossEncoder] = None
+
+    _predict_lock = asyncio.Semaphore(1)
 
     @classmethod
     async def rerank(
@@ -23,6 +26,11 @@ class MSMarcoReranker(BaseReranker):
         name = model_name or cls._model_name
 
         if cls._model is None or (model_name and name != cls._model_name):
+            if cls._model is not None:
+                del cls._model
+                torch.cuda.empty_cache()
+                gc.collect()
+
             logger.info(f"Init rerank model: {name}")
             cls._model = CrossEncoder(name, device='cuda')
             cls._model_name = name
@@ -37,7 +45,10 @@ class MSMarcoReranker(BaseReranker):
 
         inputs = [[query, passage] for passage in passages]
 
-        raw_scores = await asyncio.to_thread(cls._model.predict, inputs)
+        async with cls._predict_lock:
+            raw_scores = await asyncio.to_thread(cls._model.predict, inputs)
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
 
         scores: List[float] = [float(s) for s in raw_scores]
 

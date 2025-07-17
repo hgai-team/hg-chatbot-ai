@@ -196,15 +196,15 @@ class GenBotService(BaseBotService):
                 ):
                     if data['_type'] == 'response':
                         response += data['text']
-                        yield data
+                    yield data
 
-                    await self._update_chat(
-                        chat_id=chat_id,
-                        response=response,
-                        start_time=start_time_chat,
-                        status=ChatStatus.FINISHED.value
-                    )
-                    return
+                await self._update_chat(
+                    chat_id=chat_id,
+                    response=response,
+                    start_time=start_time_chat,
+                    status=ChatStatus.FINISHED.value
+                )
+                return
 
             response: ChatResponse = await self.google_llm.arun(
                 messages=initial_messages + [ChatMessage(role=MessageRole.USER, content=query_text)]

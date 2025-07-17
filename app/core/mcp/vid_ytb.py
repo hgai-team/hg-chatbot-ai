@@ -31,8 +31,8 @@ async def _analyze(
                 types.Part(
                     file_data=types.FileData(file_uri=video_url),
                     video_metadata=types.VideoMetadata(
-                        start_time=start_time,
-                        end_time=end_time,
+                        start_offset=start_time,
+                        end_offset=end_time,
                         fps=fps,
                     )
                 ),
@@ -103,9 +103,7 @@ async def video_analyze(
                 )
 
             yield {'_type': 'response', 'text': response.text}
-            return
 
-    yield {'_type': 'response', 'text': response.message.content}
-
-
+        else:
+            yield {'_type': 'response', 'text': response.message.content}
 
