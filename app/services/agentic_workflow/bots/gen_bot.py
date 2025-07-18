@@ -11,6 +11,7 @@ from datetime import datetime
 from fastapi import HTTPException
 
 from llama_index.core.llms import ChatMessage, MessageRole, ChatResponse
+from openai.types.chat.chat_completion import ChatCompletion
 
 from .base import BaseBotService
 
@@ -206,18 +207,18 @@ class GenBotService(BaseBotService):
                 )
                 return
 
-            response: ChatResponse = await self.google_llm.arun(
+            response: ChatCompletion = await self.xai_llm.arun(
                 messages=initial_messages + [ChatMessage(role=MessageRole.USER, content=query_text)]
             )
 
             await self._update_chat(
                 chat_id=chat_id,
-                response=response.message.content,
+                response=response.choices[0].message.content,
                 start_time=start_time_chat,
                 status=ChatStatus.FINISHED.value
             )
 
-            yield {'_type': 'response', 'text': response.message.content}
+            yield {'_type': 'response', 'text': response.choices[0].message.content}
 
         except HTTPException as http_exc:
             raise http_exc

@@ -13,8 +13,8 @@ async def _analyze(
     video_analyzer: dict,
     video_url: str,
     user_request: str,
-    start_time: str,
-    end_time: str,
+    start_offset: str,
+    end_offset: str,
     fps: int,
 ):
     client = genai.Client(
@@ -31,8 +31,8 @@ async def _analyze(
                 types.Part(
                     file_data=types.FileData(file_uri=video_url),
                     video_metadata=types.VideoMetadata(
-                        start_offset=start_time,
-                        end_offset=end_time,
+                        start_offset=start_offset,
+                        end_offset=end_offset,
                         fps=fps,
                     )
                 ),
@@ -97,9 +97,9 @@ async def video_analyze(
                     video_analyzer=video_analyzer,
                     video_url=json_resp['video_url'],
                     user_request=json_resp['user_request'],
-                    start_time=start_time,
-                    end_time=end_time,
-                    fps=fps
+                    start_offset=json_resp['analysis_params']['start_offset'],
+                    end_offset=json_resp['analysis_params']['end_offset'],
+                    fps=json_resp['analysis_params']['fps']
                 )
 
             yield {'_type': 'response', 'text': response.text}

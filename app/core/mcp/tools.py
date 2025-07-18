@@ -10,13 +10,13 @@ from .schema import (
 )
 
 comment_analyzer_tool = ToolDefinition(
-    name="comment_analyze",
+    name="Phân tích bình luận video YouTube",
     description="Phân tích bình luận (1000 bình luận  mới nhất) của một video YouTube dựa trên một yêu cầu cụ thể từ người dùng.",
     args_schema=CommentAnalyze
 )
 
 video_analyzer_tool = ToolDefinition(
-    name="video_analyze",
+    name="Phân tích nội dung video YouTube",
     description="Phân tích nội dung của một video YouTube dựa trên một yêu cầu cụ thể từ người dùng.",
     args_schema=VideoAnalyze
 )
