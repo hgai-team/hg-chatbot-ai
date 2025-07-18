@@ -11,7 +11,7 @@ from .schema import (
 
 comment_analyzer_tool = ToolDefinition(
     name="comment_analyze",
-    description="Phân tích bình luận của một video YouTube dựa trên một yêu cầu cụ thể từ người dùng.",
+    description="Phân tích bình luận (1000 bình luận  mới nhất) của một video YouTube dựa trên một yêu cầu cụ thể từ người dùng.",
     args_schema=CommentAnalyze
 )
 

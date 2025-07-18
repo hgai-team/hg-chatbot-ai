@@ -2,6 +2,9 @@ services:
   hg-chatbot:
     image: krntl/hgcb:latest
     container_name: dev-hg-chatbot
+
+    restart: always
+
     env_file:
       - .env
     ports:
@@ -21,14 +24,19 @@ services:
               capabilities: [gpu]
 
     command: uvicorn main:app --host 0.0.0.0 --port 28888 --reload
+
     depends_on:
       - mongodb-hg-chatbot
       - qdrant-hg-chatbot
       - postgres-hg-chatbot
+      - crawl-comment
 
   mongodb-hg-chatbot:
     image: mongodb/mongodb-community-server:7.0.11-ubuntu2204
     container_name: dev-mongodb-hg-chatbot
+
+    restart: always
+
     ports:
       - "27017:27017"
     environment:
@@ -50,6 +58,9 @@ services:
   qdrant-hg-chatbot:
     image: qdrant/qdrant:v1.14.1
     container_name: dev-qdrant-hg-chatbot
+
+    restart: always
+
     ports:
       - 6333:6333
       - 6334:6334
@@ -71,6 +82,7 @@ services:
     container_name: dev-postgres-hg-chatbot
     ports:
       - '5432:5432'
+
     restart: always
 
     environment:
@@ -88,17 +100,19 @@ services:
       resources:
         limits:
           memory: 2G
-          cpus: '5.0'
+          cpus: '3.0'
         reservations:
           memory: 256M
-          cpus: '2.0'
+          cpus: '1.25'
 
   crawl-comment:
     image: krntl/crawl-comment:latest
+    container_name: dev-crawl-comment
+
+    restart: always
 
     networks:
       - hg-chatbot-network
-    restart: always
 
 networks:
   hg-chatbot-network:

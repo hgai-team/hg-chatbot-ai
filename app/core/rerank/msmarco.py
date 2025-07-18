@@ -23,16 +23,24 @@ class MSMarcoReranker(BaseReranker):
         model_name: Optional[str] = None
     ) -> List[Tuple[str, float]]:
 
+        if not torch.cuda.is_available():
+            raise RuntimeError("CUDA GPU is required but not available")
+
         name = model_name or cls._model_name
 
         if cls._model is None or (model_name and name != cls._model_name):
             if cls._model is not None:
+                try:
+                    cls._model.to('cpu')
+                except Exception:
+                    pass
                 del cls._model
                 torch.cuda.empty_cache()
                 gc.collect()
 
             logger.info(f"Init rerank model: {name}")
             cls._model = CrossEncoder(name, device='cuda')
+            cls._model.eval()
             cls._model_name = name
 
         passages = []
@@ -46,9 +54,10 @@ class MSMarcoReranker(BaseReranker):
         inputs = [[query, passage] for passage in passages]
 
         async with cls._predict_lock:
-            raw_scores = await asyncio.to_thread(cls._model.predict, inputs)
-            torch.cuda.synchronize()
-            torch.cuda.empty_cache()
+            def _predict():
+                with torch.no_grad():
+                    return cls._model.predict(inputs)
+            raw_scores = await asyncio.to_thread(_predict)
 
         scores: List[float] = [float(s) for s in raw_scores]
 

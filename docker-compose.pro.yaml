@@ -28,6 +28,7 @@ services:
       - mongodb-hg-chatbot
       - qdrant-hg-chatbot
       - postgres-hg-chatbot
+      - crawl-comment
 
   mongodb-hg-chatbot:
     image: mongodb/mongodb-community-server:7.0.11-ubuntu2204
@@ -46,7 +47,7 @@ services:
       resources:
         limits:
           memory: 2G
-          cpus: '4.0'
+          cpus: '3.0'
         reservations:
           memory: 512M
           cpus: '1.25'
@@ -65,7 +66,7 @@ services:
         resources:
           limits:
             memory: 2G
-            cpus: '4.0'
+            cpus: '3.0'
           reservations:
             memory: 512M
             cpus: '1.25'
@@ -90,11 +91,20 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
+          memory: 2G
           cpus: '3.0'
         reservations:
           memory: 256M
-          cpus: '1.0'
+          cpus: '1.25'
+
+  crawl-comment:
+    image: krntl/crawl-comment:latest
+    container_name: pro-crawl-comment
+
+    restart: always
+
+    networks:
+      - pro-hg-chatbot-network
 
 networks:
   pro-hg-chatbot-network:

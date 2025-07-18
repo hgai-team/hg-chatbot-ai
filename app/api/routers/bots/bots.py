@@ -1,6 +1,7 @@
 import logging
 logger = logging.getLogger(__name__)
 
+import requests
 import timeit
 from datetime import datetime, timedelta, timezone
 
@@ -425,6 +426,49 @@ async def count_tokens(
         )
     except Exception as e:
         logger.error(f"An error occurred in count_tokens for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
+@app.post(
+    "/{bot_name}/sessions/count-video-tokens",
+    dependencies=[Depends(validate_auth)],
+    response_model=BaseResponse,
+    tags=['Sessions']
+)
+async def count_video_tokens(
+    video_url: str = Body(..., embed=True),
+    start_offset: str = Body(None, embed=True),
+    end_offset: str = Body(None, embed=True),
+    fps: int = Body(1, embed=True),
+    bot_name: str = Path(...),
+):
+    try:
+        if start_offset is not None and end_offset is not None:
+            total_tokens = (int(end_offset[:-1]) - int(start_offset[:-1])) * int(fps) * 300
+        else:
+            downstream = "http://crawl-comment:5000/api/video/check"
+            params = {"url": video_url}
+            resp = requests.post(downstream, params=params, timeout=5)
+            js_resp = resp.json()
+            if js_resp["exists"]:
+                total_tokens = js_resp["video_info"]["duration_seconds"] * int(fps) * 300
+
+        return BaseResponse(
+            status=200,
+            data={
+                "totalTokens": total_tokens
+            }
+        )
+    except AttributeError as e:
+        logger.error(f"Attribute error in count_video_tokens for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=f"Bot '{bot_name}' does not support count_video_tokens feature"
+        )
+    except Exception as e:
+        logger.error(f"An error occurred in count_video_tokens for bot '{bot_name}': {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
