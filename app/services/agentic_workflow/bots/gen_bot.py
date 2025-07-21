@@ -154,9 +154,6 @@ class GenBotService(BaseBotService):
         query_text: str,
         user_id: str,
         session_id: str,
-        start_time: str,
-        end_time: str,
-        fps: int,
         selected_tool: str
     ) -> AsyncGenerator[str, None]:
         start_time_chat = timeit.default_timer()
@@ -190,9 +187,6 @@ class GenBotService(BaseBotService):
                     query_text=query_text,
                     user_id=user_id,
                     session_id=session_id,
-                    start_time=start_time,
-                    end_time=end_time,
-                    fps=fps,
                     initial_messages=initial_messages,
                 ):
                     if data['_type'] == 'response':

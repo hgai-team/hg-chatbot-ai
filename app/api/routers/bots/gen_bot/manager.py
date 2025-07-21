@@ -58,9 +58,6 @@ class GenBotManager(BaseManager):
             query_text=chat_request.query_text,
             user_id=chat_request.user_id,
             session_id=chat_request.session_id,
-            start_time=chat_request.start_time,
-            end_time=chat_request.end_time,
-            fps=chat_request.fps,
             selected_tool=chat_request.selected_tool
         ):
             yield chunk

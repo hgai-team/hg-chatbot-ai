@@ -47,9 +47,6 @@ async def video_analyze(
     query_text: str,
     user_id: str,
     session_id: str,
-    start_time: str,
-    end_time: str,
-    fps: int,
     initial_messages: list[ChatMessage],
     *args, **kwargs
 ):
