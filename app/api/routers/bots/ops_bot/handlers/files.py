@@ -115,7 +115,7 @@ async def ops_upload_excel_user_infos(
     BOT_SAVE_PATH.mkdir(parents=True, exist_ok=True)
     
     _, file_stream = await parse_file(file)
-    bot_service.file_processor._save_file(
+    await bot_service.file_processor._save_file(
         file_stream=file_stream,
         file_name=file_name,
         save_directory=BOT_SAVE_PATH
