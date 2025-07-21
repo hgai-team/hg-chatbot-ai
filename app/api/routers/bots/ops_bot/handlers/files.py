@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import timezone
 from zoneinfo import ZoneInfo
 from uuid import UUID
-
+from pathlib import Path
 
 from fastapi import (
     HTTPException,
@@ -31,6 +31,8 @@ from api.routers.bots.tools.files import (
 from api.schema import DocumentType, FileInfo, UserInfo
 
 from services.agentic_workflow.bots.ops_bot import OpsBotService
+
+from core.parsers import parse_file
 
 async def ops_get_files_metadata(
     bot_service: OpsBotService,
@@ -103,13 +105,21 @@ async def ops_upload_excel_user_infos(
 ):
     size_bytes = file.size or 0
     file_size = round(size_bytes / (1024 * 1024), 2)
-
     file_name = file.filename
 
     contents = await file.read()
-
     with BytesIO(contents) as buffer:
         df = pd.read_excel(buffer)
+        
+    BOT_SAVE_PATH = Path("./data") / bot_service.bot_name / document_type.name
+    BOT_SAVE_PATH.mkdir(parents=True, exist_ok=True)
+    
+    _, file_stream = await parse_file(file)
+    bot_service.file_processor._save_file(
+        file_stream=file_stream,
+        file_name=file_name,
+        save_directory=BOT_SAVE_PATH
+    )
 
     df.columns = [col.lower() for col in df.columns.tolist()]
 
