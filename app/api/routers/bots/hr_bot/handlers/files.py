@@ -2,50 +2,82 @@ from datetime import timezone
 from zoneinfo import ZoneInfo
 
 from fastapi import (
+    HTTPException,
     UploadFile,
+    status,
     File,
 )
 
-from typing import Literal
+from api.routers.bots.tools.files import (
+    create_file_info,
+    is_file_exists,
+    get_file_info,
+    get_files_info,
+    delete_file_info,
+)
+
+from api.schema import DocumentType, FileInfo
 
 from services.agentic_workflow.bots.hr_bot import HrBotService
 
 async def hr_get_files_metadata(
     bot_service: HrBotService,
+    document_type: DocumentType = DocumentType.CHATBOT
 ):
-    docs = await bot_service.file_processor.mongodb_doc_store.get_all()
-    docs_metadata = []
-    seen_file = set()
-    for doc in docs:
-        metadata = doc.metadata
-        if metadata['file_name'] not in seen_file:
-            docs_metadata.append(
-                {
-                    'file_name': metadata['file_name'],
-                    'uploaded_at': metadata['uploaded_at'].replace(tzinfo=timezone.utc).astimezone(ZoneInfo("Asia/Bangkok")),
-                }
-            )
-            seen_file.add(metadata['file_name'])
+    files_info = await get_files_info(
+        bot_name=bot_service.bot_name,
+        document_type=document_type
+    )
 
-    return sorted(docs_metadata, key=lambda doc: doc['uploaded_at'], reverse=True)
+    for file_info in files_info:
+        file_info.uploaded_at = file_info.uploaded_at.replace(tzinfo=timezone.utc).astimezone(ZoneInfo("Asia/Bangkok"))
+
+    return files_info
 
 async def hr_delete_file(
     bot_service: HrBotService,
-    file_name: str,
+    file_id: str,
 ):
+    if not await is_file_exists(file_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found."
+        )
+
+    file_info: FileInfo = await get_file_info(file_id)
 
     response = await bot_service.file_processor.delete_file_data(
-        file_name=file_name
+        file_name=file_info.file_name,
+        document_type=file_info.document_type
     )
+
+    await delete_file_info(file_id)
+
     return response
 
 
 async def hr_ocr_pdf_to_md(
     bot_service: HrBotService,
+    email: str,
     file: UploadFile,
+    document_type: DocumentType = DocumentType.CHATBOT
 ):
+    size_bytes = file.size or 0
+    file_size = round(size_bytes / (1024 * 1024), 2)
+
+    file_name = file.filename
+
     response = await bot_service.file_processor.ocr_pdf_to_md(
         file=file,
+        document_type=document_type
+    )
+
+    await create_file_info(
+        email=email,
+        bot_name=bot_service.bot_name,
+        document_type=document_type,
+        file_name=file_name,
+        file_size=file_size
     )
 
     return response

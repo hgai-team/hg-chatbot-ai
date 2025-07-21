@@ -64,7 +64,13 @@ async def lifespan(app: FastAPI):
             except asyncio.CancelledError:
                 logger.info("Discord bot task cancelled")
 
-app = FastAPI(lifespan=lifespan)
+disable_docs = get_api_settings().ENV == "pro"
+app = FastAPI(
+    lifespan=lifespan,
+    openapi_url=None      if disable_docs else "/openapi.json",
+    docs_url=None         if disable_docs else "/docs",
+    redoc_url=None        if disable_docs else "/redoc",
+)
 app.include_router(api_app)
 
 # Add CORS middleware

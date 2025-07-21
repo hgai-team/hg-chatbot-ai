@@ -4,7 +4,7 @@ import asyncio
 from services.agentic_workflow.bots.ops_bot import OpsBotService
 from core.parsers import simple_tokenize
 
-from .master_data import get_user_info, aggregated_user_info
+from .user_info import get_user_info, aggregated_user_info
 
 async def yield_data(
     _type: str,
@@ -68,7 +68,7 @@ async def ops_chat_user_stream(
 ):
     user_roles = await get_user_info(email=email)
     user_roles = [user_role.model_dump() for user_role in user_roles]
-    
+
     aggregated_info = await aggregated_user_info(email=email)
 
     yield await yield_data('header_thinking', "Đang xử lý...\n")

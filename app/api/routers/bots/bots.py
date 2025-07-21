@@ -4,16 +4,22 @@ logger = logging.getLogger(__name__)
 import requests
 import timeit
 from datetime import datetime, timedelta, timezone
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Path, status, UploadFile, File, Query, Body
+from fastapi import (
+    APIRouter, HTTPException, UploadFile, status,
+    Depends, Path, File, Query, Body, Form
+)
 from fastapi.responses import StreamingResponse
 from typing import Literal
+
+from pydantic import EmailStr
 
 from api.security.api_credentials import validate_auth
 from api.schema import (
     BaseResponse,
     ChatRequest, ChatResponse, UserContext,
-    FileResponse,
+    FileResponse, DocumentType,
     SessionResponse, SessionRatingResponse,
     AgentRequest, AgentResponse, AgentResult,
     LogResponse, LogResult
@@ -187,10 +193,13 @@ async def chat_user_stream(
 )
 async def get_files_metadata(
     bot_name: str = Path(...),
+    document_type: DocumentType = DocumentType.CHATBOT
 ):
     bot_manager: BaseManager = get_bot_manager(bot_name)
     try:
-        response = await bot_manager.get_files_metadata()
+        response = await bot_manager.get_files_metadata(
+            document_type=document_type
+        )
         return response
 
     except AttributeError as e:
@@ -209,19 +218,22 @@ async def get_files_metadata(
 @app.delete(
     "/{bot_name}/files",
     dependencies=[Depends(validate_auth)],
-    response_model=FileResponse,
+    # response_model=FileResponse,
     tags=['Files']
 )
 async def delete_file(
     bot_name: str = Path(...),
-    file_name: str = Body(..., embed=True),
+    file_id: UUID = Body(..., embed=True),
 ):
     bot_manager: BaseManager = get_bot_manager(bot_name)
     try:
         response = await bot_manager.delete_file(
-            file_name=file_name
+            file_id=file_id
         )
-        return FileResponse(**response)
+        return response
+        # return FileResponse(**response)
+    except HTTPException:
+        raise
     except AttributeError as e:
         logger.error(f"Attribute error in delete_file for bot '{bot_name}': {e}", exc_info=True)
         raise HTTPException(
@@ -238,14 +250,15 @@ async def delete_file(
 @app.post(
     "/{bot_name}/files/excel",
     dependencies=[Depends(validate_auth)],
-    response_model=FileResponse,
+    # response_model=FileResponse,
     tags=['Files']
 )
 async def upload_excel(
     bot_name: str = Path(...),
+    email: EmailStr = Form(...),
     file: UploadFile = File(...),
-    use_type: bool = Literal[True, False],
-    use_pandas: bool = Literal[False, True]
+    use_pandas: bool = Form(False),
+    document_type: DocumentType = Form(DocumentType.CHATBOT)
 ):
     if not file.filename.endswith((".xlsx", ".xls", ".xlsm")):
         raise HTTPException(
@@ -256,11 +269,13 @@ async def upload_excel(
     bot_manager: BaseManager = get_bot_manager(bot_name)
     try:
         response = await bot_manager.upload_excel(
+            email=email,
             file=file,
-            use_type=use_type,
-            use_pandas=use_pandas
+            use_pandas=use_pandas,
+            document_type=document_type
         )
-        return FileResponse(**response)
+        return response
+        # return FileResponse(**response)
     except AttributeError as e:
         logger.error(f"Attribute error in upload_excel for bot '{bot_name}': {e}", exc_info=True)
         raise HTTPException(
@@ -281,7 +296,9 @@ async def upload_excel(
 )
 async def ocr_pdf_to_md(
     bot_name: str = Path(...),
+    email: EmailStr = Form(...),
     file: UploadFile = File(...),
+    document_type: DocumentType = Form(DocumentType.CHATBOT)
 ):
     if not file.filename.endswith((".pdf")):
         raise HTTPException(
@@ -292,7 +309,9 @@ async def ocr_pdf_to_md(
     bot_manager: BaseManager = get_bot_manager(bot_name)
     try:
         response = await bot_manager.ocr_pdf_to_md(
+            email=email,
             file=file,
+            document_type=document_type
         )
         return response
 
@@ -590,6 +609,90 @@ async def get_user_sys_resp_cnt(
         )
     except Exception as e:
         logger.error(f"An error occurred in get_user_sys_resp_cnt for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
+# User Info API Endpoints
+@app.get(
+    "/{bot_name}/users",
+    dependencies=[Depends(validate_auth)],
+    tags=['User Info']
+)
+async def get_users(
+    bot_name: str = Path(...)
+):
+    bot_manager: BaseManager = get_bot_manager(bot_name)
+    try:
+        response = await bot_manager.get_users()
+        return response
+    except HTTPException:
+        raise
+    except AttributeError as e:
+        logger.error(f"Attribute error in get_users for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=f"Bot '{bot_name}' does not support get_users feature"
+        )
+    except Exception as e:
+        logger.error(f"An unhandled error occurred in get_users for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
+@app.get(
+    "/{bot_name}/user",
+    dependencies=[Depends(validate_auth)],
+    tags=['User Info']
+)
+async def get_user(
+    bot_name: str = Path(...),
+    email: EmailStr = Query(...),
+):
+    bot_manager: BaseManager = get_bot_manager(bot_name)
+    try:
+        response = await bot_manager.get_user(email=email)
+        return response
+    except HTTPException:
+        raise
+    except AttributeError as e:
+        logger.error(f"Attribute error in get_user for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=f"Bot '{bot_name}' does not support get_user feature"
+        )
+    except Exception as e:
+        logger.error(f"An unhandled error occurred in get_user for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
+@app.get(
+    "/{bot_name}/user/aggregated",
+    dependencies=[Depends(validate_auth)],
+    tags=['User Info']
+)
+async def get_aggregated_user(
+    bot_name: str = Path(...),
+    email: EmailStr = Query(...),
+):
+    bot_manager: BaseManager = get_bot_manager(bot_name)
+    try:
+        response = await bot_manager.get_aggregated_user(email=email)
+        return response
+    except HTTPException:
+        raise
+    except AttributeError as e:
+        logger.error(f"Attribute error in get_user for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=f"Bot '{bot_name}' does not support get_user feature"
+        )
+    except Exception as e:
+        logger.error(f"An unhandled error occurred in get_user for bot '{bot_name}': {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"

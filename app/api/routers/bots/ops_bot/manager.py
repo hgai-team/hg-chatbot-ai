@@ -4,6 +4,7 @@ import pandas as pd
 from fastapi import UploadFile, HTTPException, status
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
+from uuid import UUID
 
 from google import genai
 from google.genai import types
@@ -18,7 +19,14 @@ from .handlers.chat import (
 from .handlers.files import (
     ops_get_files_metadata,
     ops_delete_file,
-    ops_upload_excel
+    ops_upload_excel,
+    ops_upload_excel_user_infos
+)
+
+from .handlers.user_info import (
+    get_all_user_info,
+    get_user_info,
+    aggregated_user_info
 )
 
 from services import get_settings_cached
@@ -27,7 +35,7 @@ from services.agentic_workflow.tools.prompt_processor import PromptProcessorTool
 from api.routers.bots.base import BaseManager
 from api.schema import (
     ChatRequest, UserContext,
-    AgentRequest
+    AgentRequest, DocumentType
 )
 
 class OpsBotManager(BaseManager):
@@ -89,34 +97,46 @@ class OpsBotManager(BaseManager):
     # File
     async def get_files_metadata(
         self,
+        document_type: DocumentType = DocumentType.CHATBOT
     ):
         response = await ops_get_files_metadata(
-            ops_bot_service=self.ops_bot,
+            bot_service=self.ops_bot,
+            document_type=document_type
         )
         return response
 
     async def delete_file(
         self,
-        file_name: str
+        file_id: UUID
     ):
         response = await ops_delete_file(
-            file_service=self.ops_bot,
-            file_name=file_name
+            bot_service=self.ops_bot,
+            file_id=file_id
         )
         return response
 
     async def upload_excel(
         self,
+        email: str,
         file: UploadFile,
-        use_type: bool = False,
-        use_pandas: bool = False
+        use_pandas: bool = False,
+        document_type: DocumentType = DocumentType.CHATBOT
     ):
-        response = await ops_upload_excel(
-            file_service=self.ops_bot,
-            file=file,
-            use_type=use_type,
-            use_pandas=use_pandas
-        )
+        if document_type == DocumentType.CHATBOT:
+            response = await ops_upload_excel(
+                bot_service=self.ops_bot,
+                email=email,
+                file=file,
+                use_pandas=use_pandas,
+                document_type=document_type
+            )
+        elif document_type == DocumentType.USER_INFO:
+            response = await ops_upload_excel_user_infos(
+                bot_service=self.ops_bot,
+                email=email,
+                file=file,
+                document_type=document_type
+            )
         return response
 
     # Session
@@ -149,20 +169,20 @@ class OpsBotManager(BaseManager):
         session_his = await self.ops_bot.memory_store.get_session_history(
             session_id=session_id
         )
-        
+
         extra_content = []
         if message:
             extra_content = [types.Content(role="user", parts=[types.Part(text=message)])]
-        
+
         contents = [
             types.Content(role=role, parts=[types.Part(text=text if text else "")])
             for record in session_his.history
             for role, text in (("user", record["message"]), ("model", record["response"]))
         ]
-        
+
         if extra_content:
             contents = contents + extra_content
-        
+
         if not contents:
             return {
                 "totalTokens": 0,
@@ -279,6 +299,49 @@ class OpsBotManager(BaseManager):
                 detail=f"Error processing logs: {str(e)}"
             )
 
+    async def get_user_sys_resp_cnt(
+        self,
+        user_id: str
+    ):
+        his_sessions = await self.ops_bot.memory_store.get_user_sessions(
+            user_id=user_id,
+        )
+        return sum([len(chat) for chat in his_sessions])
+
+    # User Info
+    async def get_users(
+        self,
+    ):
+        data = await get_all_user_info()
+
+        return {
+            "status": 200,
+            "data": data
+        }
+
+    async def get_user(
+        self,
+        email: str,
+    ):
+        data = await get_user_info(email=email)
+
+        return {
+            "status": 200,
+            "data": data
+        }
+
+    async def get_aggregated_user(
+        self,
+        email: str
+    ):
+        data = await aggregated_user_info(email=email)
+
+        return {
+            "status": 200,
+            "data": data
+        }
+
+    # Agent
     async def agent_evaluation(
         self,
         agent_request: AgentRequest,
@@ -306,12 +369,3 @@ class OpsBotManager(BaseManager):
         )
 
         return response
-
-    async def get_user_sys_resp_cnt(
-        self,
-        user_id: str
-    ):
-        his_sessions = await self.ops_bot.memory_store.get_user_sessions(
-            user_id=user_id,
-        )
-        return sum([len(chat) for chat in his_sessions])

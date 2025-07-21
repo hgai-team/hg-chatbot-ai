@@ -3,13 +3,12 @@ from sqlmodel import create_engine, Session, SQLModel
 
 from api.routers import (
     bots_router,
-    ops_router,
 
     auth_router,
 )
 
 from api.security import validate_auth
-from api.schema import MasterData, UserInfo
+from api.schema import UserInfo, FileInfo
 from core.storages.client import PostgresEngineManager
 from core.storages.tracestores import TraceSpan, SpanCreate
 
@@ -30,7 +29,6 @@ def health_check():
     return {"status": 200}
 
 app.include_router(bots_router)
-app.include_router(ops_router)
 
 app.include_router(auth_router)
 

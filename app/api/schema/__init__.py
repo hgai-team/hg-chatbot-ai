@@ -2,9 +2,14 @@ from .chat import ChatRequest, ChatResponse, UserContext
 
 from .base import BaseResponse
 
-from .file import FileResponse
+from .file import (
+    FileResponse,
+    FileInfo, DocumentType
+)
 
-from .master_data import MasterData, MasterDataInput, MasterDataResponse, UserInfo
+from .user_info import (
+    UserInfo,
+)
 
 from .sessions import SessionResponse, SessionResult, SessionRatingResponse, SessionRatingResult
 
@@ -20,11 +25,10 @@ __all__ = [
     'BaseResponse',
 
     'FileResponse',
+    'FileInfo',
+    'DocumentType',
 
-    'MasterData',
-    'MasterDataInput',
-    'MasterDataResponse',
-    'UserInfo'
+    'UserInfo',
 
     'SessionResponse',
     'SessionResult',

@@ -2,6 +2,7 @@ import io
 import pandas as pd
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
+from uuid import UUID
 
 from fastapi import UploadFile, HTTPException, status
 from google import genai
@@ -11,7 +12,8 @@ from services import get_settings_cached
 from services.agentic_workflow.bots.hr_bot import HrBotService
 from api.routers.bots.base import BaseManager
 from api.schema import (
-    ChatRequest
+    ChatRequest,
+    DocumentType
 )
 
 from .handlers.chat import (
@@ -76,29 +78,35 @@ class HrBotManager(BaseManager):
     # File
     async def get_files_metadata(
         self,
+        document_type: DocumentType = DocumentType.CHATBOT
     ):
         response = await hr_get_files_metadata(
             bot_service=self.hr_bot,
+            document_type=document_type
         )
         return response
 
     async def delete_file(
         self,
-        file_name: str
+        file_id: UUID
     ):
         response = await hr_delete_file(
             bot_service=self.hr_bot,
-            file_name=file_name
+            file_id=file_id
         )
         return response
 
     async def ocr_pdf_to_md(
         self,
-        file: UploadFile
+        email: str,
+        file: UploadFile,
+        document_type: DocumentType = DocumentType.CHATBOT
     ):
         response = await hr_ocr_pdf_to_md(
             bot_service=self.hr_bot,
-            file=file
+            email=email,
+            file=file,
+            document_type=document_type
         )
         return response
 

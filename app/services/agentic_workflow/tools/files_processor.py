@@ -5,9 +5,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Union
 
 from fastapi import HTTPException, UploadFile
+from openai.types.chat.chat_completion import ChatCompletion
+from llama_index.core.llms import ChatResponse
+
+from api.schema import DocumentType
 
 from core.loaders import (
     ExcelReader,
@@ -24,11 +28,15 @@ from core.storages import (
 
 from core.embeddings import OpenAIEmbedding
 from core.base import Document
-from services.agentic_workflow.tools.prompt_processor import PromptProcessorTool
-
 from core.loaders.utils import get_visible_sheets
 from core.parsers import parse_file, json_parser
-from services import get_settings_cached, get_google_genai_llm
+
+from services.agentic_workflow.tools.prompt_processor import PromptProcessorTool
+from services import (
+    get_settings_cached,
+    get_google_genai_llm, GoogleGenAILLM,
+    get_xai_llm, XAILLM
+)
 
 DEFAULT_SAVE_PATH = Path("./data")
 CONCURRENT_LIMIT = 7
@@ -99,11 +107,13 @@ class FileProcessorTool:
     async def chat(
         self,
         input_: str,
-        model: Callable,
+        model: Union[XAILLM, GoogleGenAILLM],
         agent_prompt_path: str,
         agent_name: str,
         func_name: str
     ):
+        class_model_name = model.__class__.__name__
+
         async with asyncio.Semaphore(10):
             agent_config = PromptProcessorTool.load_prompt(agent_prompt_path)[agent_name]
             prompt_template = PromptProcessorTool.load_prompt(get_settings_cached().BASE_PROMPT_PATH)
@@ -118,11 +128,17 @@ class FileProcessorTool:
                         **{**agent_config, **{"input": input_}}
                     )
                     messages = PromptProcessorTool.prepare_chat_messages(prompt=prompt)
-                    response = await model.arun(messages)
 
-                    json_response = json_parser(response)
+                    if class_model_name == "XAILLM":
+                        response: ChatCompletion = await model.arun(messages=messages)
+                    elif class_model_name == "GoogleGenAILLM":
+                        response: ChatResponse = await model.arun(messages=messages)
+
+                    text_response = response.choices[0].message.content if class_model_name == "XAILLM" else response.message.content
+
+                    json_response = json_parser(text_response)
                     if json_response.get("status", "") == "error":
-                        json_response = response
+                        json_response = text_response
 
                     return json_response
                 except Exception as e:
@@ -159,9 +175,10 @@ class FileProcessorTool:
                 response = await asyncio.to_thread(
                     client.models.generate_content,
                     model=get_settings_cached().GOOGLEAI_MODEL_THINKING,
-                    contents=[system_prompt, myfile],
+                    contents=[myfile],
                     config=types.GenerateContentConfig(
-                        max_output_tokens=128000,
+                        system_instruction=system_prompt,
+                        max_output_tokens=65536,
                     )
                 )
 
@@ -171,44 +188,6 @@ class FileProcessorTool:
                 continue
 
         return None
-
-    async def ops_bot_get_context_data(
-        self
-    ):
-        from api.routers.bots.ops_bot.handlers.master_data import get_all_master_data
-
-        context_data = {}
-        response = await get_all_master_data()
-
-        for result in response:
-            if result.type not in context_data:
-                context_data[result.type] = [result.name]
-            else:
-                context_data[result.type].append(result.name)
-
-        return context_data
-
-    async def ops_bot_find_type(
-        self,
-        input_text,
-        context_data
-    ):
-        from services import get_openai_llm, get_settings_cached
-        openai_llm = get_openai_llm(
-            model_name=get_settings_cached().OPENAI_CHAT_MODEL
-        )
-
-        input_ = f"context_data:\n{context_data}\n\ninput_text:\n{input_text}\n"
-
-        resp = await self.chat(
-            input_=input_,
-            model=openai_llm,
-            agent_prompt_path=get_settings_cached().OPS_AGENT_PROMPT_PATH,
-            agent_name='information_classifier',
-            func_name='ops_bot_find_type'
-        )
-
-        return resp
 
     async def _save_file(
         self,
@@ -227,16 +206,19 @@ class FileProcessorTool:
         self,
         file: UploadFile,
         use_pandas=False,
-        use_type=True,
+        document_type: DocumentType = DocumentType.CHATBOT,
         extra_info_include=EXTRA_INFO_INCLUDE,
         text_exclude=TEXT_EXCLUDE
     ):
         file_name, file_stream = await parse_file(file)
 
+        BOT_SAVE_PATH = DEFAULT_SAVE_PATH / self.bot_name / document_type.name
+        BOT_SAVE_PATH.mkdir(parents=True, exist_ok=True)
+
         await self._save_file(
             file_stream=file_stream,
             file_name=file_name,
-            save_directory=DEFAULT_SAVE_PATH
+            save_directory=BOT_SAVE_PATH
         )
 
         file_stream.seek(0)
@@ -251,25 +233,6 @@ class FileProcessorTool:
             text_exclude=text_exclude
         )
 
-        if use_type and docs:
-            context_data = await self.ops_bot_get_context_data()
-
-            semaphore = asyncio.Semaphore(CONCURRENT_LIMIT)
-
-            async def process_and_update_doc(doc):
-                async with semaphore:
-                    try:
-                        extra_info = await self.ops_bot_find_type(doc.text, context_data)
-                        if extra_info:
-                            doc.extra_info = {**doc.extra_info, **extra_info}
-                    except Exception as e:
-                        logger.error(f"Failed to process doc text: '{doc.text[:50]}...' due to {e}")
-                    return doc
-
-            tasks = [process_and_update_doc(doc) for doc in docs]
-            updated_docs = await asyncio.gather(*tasks)
-            docs = updated_docs
-
         tasks = [
             asyncio.create_task(self.store_docs(docs)),
             asyncio.create_task(self.embed_and_index_documents(docs)),
@@ -283,13 +246,17 @@ class FileProcessorTool:
     async def upload_pdf_data(
         self,
         file: UploadFile,
+        document_type: DocumentType = DocumentType.CHATBOT,
     ):
         file_name, file_stream = await parse_file(file)
+
+        BOT_SAVE_PATH = DEFAULT_SAVE_PATH / self.bot_name / document_type.name
+        BOT_SAVE_PATH.mkdir(parents=True, exist_ok=True)
 
         await self._save_file(
             file_stream=file_stream,
             file_name=file_name,
-            save_directory=DEFAULT_SAVE_PATH
+            save_directory=BOT_SAVE_PATH
         )
 
         file_stream.seek(0)
@@ -311,22 +278,26 @@ class FileProcessorTool:
     async def ocr_pdf_to_md(
         self,
         file: UploadFile,
+        document_type: DocumentType = DocumentType.CHATBOT,
     ):
         file_name, file_stream = await parse_file(file)
+
+        BOT_SAVE_PATH = DEFAULT_SAVE_PATH / self.bot_name / document_type.name
+        BOT_SAVE_PATH.mkdir(parents=True, exist_ok=True)
 
         await self._save_file(
             file_stream=file_stream,
             file_name=file_name,
-            save_directory=DEFAULT_SAVE_PATH
+            save_directory=BOT_SAVE_PATH
         )
 
         content = await self.ocr_to_md(
-            file_path=DEFAULT_SAVE_PATH / file_name,
+            file_path=BOT_SAVE_PATH / file_name,
             agent_name='ocr_pdf_to_md_expert'
         )
 
         md_filename = Path(file_name).stem + ".md"
-        md_path = DEFAULT_SAVE_PATH / md_filename
+        md_path = BOT_SAVE_PATH / md_filename
 
         async with aiofiles.open(md_path, 'w', encoding='utf-8') as md_file:
             await md_file.write(content)
@@ -341,7 +312,7 @@ class FileProcessorTool:
         tasks = [
             self.chat(
                 input_=f"""WHOLE_DOCUMENT:\n{content}\n\nCHUNK_CONTENT:\n{doc.get_content()}""",
-                model=get_google_genai_llm(model_name=get_settings_cached().GOOGLEAI_MODEL),
+                model=get_google_genai_llm(model_name=get_settings_cached().GOOGLEAI_MODEL_THINKING),
                 agent_prompt_path=get_settings_cached().BASE_PROMPT_PATH,
                 agent_name='contextualizer',
                 func_name='ocr_pdf_to_md'
@@ -371,13 +342,17 @@ class FileProcessorTool:
     async def upload_docx_file(
         self,
         file: UploadFile,
+        document_type: DocumentType = DocumentType.CHATBOT,
     ):
         file_name, file_stream = await parse_file(file)
+
+        BOT_SAVE_PATH = DEFAULT_SAVE_PATH / self.bot_name / document_type.name
+        BOT_SAVE_PATH.mkdir(parents=True, exist_ok=True)
 
         await self._save_file(
             file_stream=file_stream,
             file_name=file_name,
-            save_directory=DEFAULT_SAVE_PATH
+            save_directory=BOT_SAVE_PATH
         )
 
         file_stream.seek(0)
@@ -399,13 +374,18 @@ class FileProcessorTool:
     async def delete_file_data(
         self,
         file_name: str,
+        document_type: DocumentType = DocumentType.CHATBOT,
     ):
         DEFAULT_SAVE_PATH = Path("./data")
         DEFAULT_SAVE_PATH.mkdir(parents=True, exist_ok=True)
-        delete_file_path = DEFAULT_SAVE_PATH / file_name
+
+        BOT_SAVE_PATH = DEFAULT_SAVE_PATH / self.bot_name / document_type.name
+        BOT_SAVE_PATH.mkdir(parents=True, exist_ok=True)
+
+        delete_file_path = BOT_SAVE_PATH / file_name
 
         md_filename = Path(file_name).stem + ".md"
-        delete_md_path = DEFAULT_SAVE_PATH / md_filename
+        delete_md_path = BOT_SAVE_PATH / md_filename
 
         try:
             cursor = self.mongodb_doc_store.collection.find({"attributes.file_name": file_name}, {"id": 1, "_id": 0})
