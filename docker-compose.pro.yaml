@@ -40,7 +40,7 @@ services:
       MONGODB_INITDB_ROOT_USERNAME: ${MONGODB_INITDB_ROOT_USERNAME}
       MONGODB_INITDB_ROOT_PASSWORD: ${MONGODB_INITDB_ROOT_PASSWORD}
     volumes:
-      - docker_mongodb_data:/data/db
+      - pro_ai_hgcb_mongodb_data:/data/db
     networks:
       - pro-hg-chatbot-network
     deploy:
@@ -59,7 +59,7 @@ services:
     restart: always
 
     volumes:
-      - docker_qdrant_data:/qdrant/storage
+      - pro_ai_hgcb_qdrant_data:/qdrant/storage
     networks:
       - pro-hg-chatbot-network
     deploy:
@@ -111,9 +111,9 @@ networks:
     external: true
 
 volumes:
-  docker_qdrant_data:
+  pro_ai_hgcb_qdrant_data:
     external: true
-  docker_mongodb_data:
+  pro_ai_hgcb_mongodb_data:
     external: true
   pro_ai_hgcb_postgres_data:
     external: true
