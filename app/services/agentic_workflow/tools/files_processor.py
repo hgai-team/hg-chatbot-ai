@@ -312,7 +312,7 @@ class FileProcessorTool:
         tasks = [
             self.chat(
                 input_=f"""WHOLE_DOCUMENT:\n{content}\n\nCHUNK_CONTENT:\n{doc.get_content()}""",
-                model=get_google_genai_llm(model_name=get_settings_cached().GOOGLEAI_MODEL_THINKING),
+                model=get_google_genai_llm(model_name=get_settings_cached().GOOGLEAI_MODEL),
                 agent_prompt_path=get_settings_cached().BASE_PROMPT_PATH,
                 agent_name='contextualizer',
                 func_name='ocr_pdf_to_md'

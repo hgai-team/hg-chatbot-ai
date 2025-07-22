@@ -97,7 +97,8 @@ class GenBotService(BaseBotService):
                 user_id=user_id,
                 session_id=session_id,
                 chat=chat_to_store,
-                llm=self.google_llm
+                llm=self.google_llm,
+                bot_name=self.bot_name
             )
         except Exception as e:
             logger.error(f"HGGPT - Failed to store chat history in _init_base_chat for session '{session_id}': {e}", exc_info=True)
@@ -129,12 +130,11 @@ class GenBotService(BaseBotService):
         agent_name: str,
     ) -> Any:
         async with TM.trace_span(
-            span_name=f"{self.main_llm.__class__.__name__}_chat_completion",
-            span_type="LLM_AGENT_CALL",
+            span_name=agent_name,
+            span_type=self.bot_name,
             custom_metadata={
                 "user_id": user_id,
                 "session_id": session_id,
-                "agent_name": agent_name,
             }
         ) as (trace_id, span_id, wrapper):
             response: ChatResponse = await wrapper(self.main_llm.arun, messages=inal_messages)

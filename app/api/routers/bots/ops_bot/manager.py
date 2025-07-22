@@ -24,6 +24,7 @@ from .handlers.files import (
 )
 
 from .handlers.user_info import (
+    create_user_info,
     get_all_user_info,
     get_user_info,
     aggregated_user_info
@@ -309,6 +310,17 @@ class OpsBotManager(BaseManager):
         return sum([len(chat) for chat in his_sessions])
 
     # User Info
+    async def create_users(
+        self,
+        users
+    ):
+        data = await create_user_info(input_=users)
+
+        return {
+            "status": 200,
+            "data": data
+        }
+    
     async def get_users(
         self,
     ):

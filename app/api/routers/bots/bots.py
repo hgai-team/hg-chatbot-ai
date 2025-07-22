@@ -11,7 +11,7 @@ from fastapi import (
     Depends, Path, File, Query, Body, Form
 )
 from fastapi.responses import StreamingResponse
-from typing import Literal
+from typing import Literal, List
 
 from pydantic import EmailStr
 
@@ -19,7 +19,7 @@ from api.security.api_credentials import validate_auth
 from api.schema import (
     BaseResponse,
     ChatRequest, ChatResponse, UserContext,
-    FileResponse, DocumentType,
+    FileResponse, DocumentType, UserInfo,
     SessionResponse, SessionRatingResponse,
     AgentRequest, AgentResponse, AgentResult,
     LogResponse, LogResult
@@ -615,6 +615,36 @@ async def get_user_sys_resp_cnt(
         )
 
 # User Info API Endpoints
+@app.post(
+    "/{bot_name}/users",
+    dependencies=[Depends(validate_auth)],
+    tags=['User Info']
+)
+async def create_users(
+    bot_name: str = Path(...),
+    users: List[UserInfo] = Body(..., embed=True)
+):
+    bot_manager: BaseManager = get_bot_manager(bot_name)
+    try:
+        response = await bot_manager.create_users(
+            users=users
+        )
+        return response
+    except HTTPException:
+        raise
+    except AttributeError as e:
+        logger.error(f"Attribute error in create_users for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=f"Bot '{bot_name}' does not support create_users feature"
+        )
+    except Exception as e:
+        logger.error(f"An unhandled error occurred in create_users for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
 @app.get(
     "/{bot_name}/users",
     dependencies=[Depends(validate_auth)],

@@ -11,7 +11,8 @@ from llama_index.core.llms import ChatResponse
 
 from .base import BaseMemoryStore, BaseChat, ChatHistory, ChatStatus
 from core.config import get_core_settings
-from core.storages.client import MongoClientManager
+from core.storages.client import MongoClientManager, TracerManager as TM
+from core.llms import GoogleGenAILLM
 
 class MongoDBMemoryStore(BaseMemoryStore):
     """MongoDB implementation of memory store for chat history"""
@@ -52,6 +53,45 @@ class MongoDBMemoryStore(BaseMemoryStore):
     async def init_indexes(self):
         await self.collection.create_index("user_id")
         await self.collection.create_index("session_id")
+        
+    async def _create_session_title(
+        self,
+        user_id: str,
+        session_id: str,
+        bot_name: str,
+        llm: GoogleGenAILLM,
+        message: str
+    ):
+        from services.agentic_workflow.tools.prompt_processor import PromptProcessorTool as PPT
+        
+        messages=PPT.prepare_chat_messages(
+            system_prompt=(
+                "Chat Thread Title Expert: Bạn là chuyên gia chuyên tạo tiêu đề cho luồng chat. "
+                "Nhiệm vụ của bạn là dựa vào câu hỏi gốc để sinh ra một tiêu đề ngắn gọn, súc tích, phản ánh đúng chủ đề của luồng.\n"
+                "1. Nhận tham số:\n"
+                "    - question: nội dung câu hỏi gốc.\n"
+                "2. Phân tích và tổng hợp thông tin để tạo tiêu đề ngắn gọn, dễ hiểu và hấp dẫn, khái quát nội dung luồng chat.\n"
+                "3. Đầu ra phải là một đoạn text ngắn gọn dài từ 15 đến 30 ký tự."
+            ),
+            prompt=f"""
+                #Input:
+                    question:
+                    {message}
+                #Output:
+            """
+        )
+        
+        async with TM.trace_span(
+            span_name=f"create_session_title",
+            span_type=bot_name,
+            custom_metadata={
+                "user_id": user_id,
+                "session_id": session_id,
+            }
+        ) as (_, _, wrapper):
+            response: ChatResponse = await wrapper(llm.arun, messages=messages)
+        
+        return response.message.content
 
     async def add_metadata(
         self,
@@ -125,25 +165,9 @@ class MongoDBMemoryStore(BaseMemoryStore):
             )
             return None
         else:
-            from services.agentic_workflow.tools.prompt_processor import PromptProcessorTool as PPT
-
-            response: ChatResponse = await kwargs.get('llm').arun(
-                messages=PPT.prepare_chat_messages(
-                    system_prompt=(
-                        "Chat Thread Title Expert: Bạn là chuyên gia chuyên tạo tiêu đề cho luồng chat. "
-                        "Nhiệm vụ của bạn là dựa vào câu hỏi gốc để sinh ra một tiêu đề ngắn gọn, súc tích, phản ánh đúng chủ đề của luồng.\n"
-                        "1. Nhận tham số:\n"
-                        "    - question: nội dung câu hỏi gốc.\n"
-                        "2. Phân tích và tổng hợp thông tin để tạo tiêu đề ngắn gọn, dễ hiểu và hấp dẫn, khái quát nội dung luồng chat.\n"
-                        "3. Đầu ra phải là một đoạn text ngắn gọn dài từ 15 đến 30 ký tự."
-                    ),
-                    prompt=f"""
-                        #Input:
-                            question:
-                            {chat.message}
-                        #Output:
-                    """
-                )
+            session_title = await self._create_session_title(
+                user_id=user_id, session_id=session_id, bot_name=kwargs['bot_name'],
+                llm=kwargs['llm'], message=chat.message
             )
 
             new_chat_history = {
@@ -164,7 +188,7 @@ class MongoDBMemoryStore(BaseMemoryStore):
                 ],
                 "created_at": current_time,
                 "last_updated": current_time,
-                "session_title": response.message.content
+                "session_title": session_title
             }
             await self.collection.insert_one(new_chat_history)
             return new_chat_history["session_title"]
