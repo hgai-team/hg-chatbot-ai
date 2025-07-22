@@ -66,7 +66,7 @@ async def video_analyze(
 
     async with TM.trace_span(
         span_name="VidMind",
-        span_type="LLM_AGENT_CALL",
+        span_type="HGGPT",
         custom_metadata={
             "user_id": user_id,
             "session_id": session_id,
@@ -82,7 +82,7 @@ async def video_analyze(
 
             async with TM.trace_span(
                 span_name="video_analyzer",
-                span_type="LLM_AGENT_CALL",
+                span_type="HGGPT",
                 custom_metadata={
                     "user_id": user_id,
                     "session_id": session_id,

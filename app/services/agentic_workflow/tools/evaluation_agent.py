@@ -38,18 +38,18 @@ class EvaluationAgentTool:
         session_id: str,
         func: Callable,
         agent_name: str,
-        fallback: Callable[[], Any]
+        fallback: Callable[[], Any],
+        bot_name: str
     ) -> Any:
         agent_config = self._get_agent_config(agent_name)
 
         try:
             async with TM.trace_span(
-                span_name=f"{func.__name__}_{agent_name}",
-                span_type="LLM_AGENT_CALL",
+                span_name=agent_name,
+                span_type=bot_name,
                 custom_metadata={
                     "user_id": user_id,
                     "session_id": session_id,
-                    "agent_name": agent_name,
                 }
             ) as (trace_id, span_id, wrapper):
 
@@ -74,6 +74,7 @@ class EvaluationAgentTool:
         session_id: str,
         func: Callable,
         agent_name: str,
+        bot_name: str = "VaHaCha"
     ) -> Dict[str, Any]:
         default_response = {"relevant_context_ids": []}
 
@@ -96,7 +97,8 @@ class EvaluationAgentTool:
             session_id=session_id,
             func=func,
             agent_name=agent_name,
-            fallback=lambda: default_response
+            fallback=lambda: default_response,
+            bot_name=bot_name
         )
 
     async def validate(
@@ -105,7 +107,8 @@ class EvaluationAgentTool:
         user_id: str,
         session_id: str,
         func: Callable,
-        agent_name: str
+        agent_name: str,
+        bot_name: str = "VaHaCha"
     ) -> Dict[str, Any]:
         def fallback():
             return {
@@ -120,7 +123,8 @@ class EvaluationAgentTool:
             session_id=session_id,
             func=func,
             agent_name=agent_name,
-            fallback=fallback
+            fallback=fallback,
+            bot_name=bot_name
         )
 
     async def intent_synthesis(
@@ -129,7 +133,8 @@ class EvaluationAgentTool:
         user_id: str,
         session_id: str,
         func: Callable,
-        agent_name: str
+        agent_name: str,
+        bot_name: str = "VaHaCha"
     ) -> Dict[str, Any]:
         formatted_history = "\n".join(
             f"{msg.role}: {msg.content}" for msg in chat_messages
@@ -141,5 +146,6 @@ class EvaluationAgentTool:
             session_id=session_id,
             func=func,
             agent_name=agent_name,
-            fallback=lambda: {"status": "error", "question": None}
+            fallback=lambda: {"status": "error", "question": None},
+            bot_name=bot_name
         )

@@ -53,11 +53,10 @@ async def _chat(
     try:
         async with TM.trace_span(
             span_name=agent_name,
-            span_type="LLM_AGENT_CALL",
+            span_type="HGGPT",
             custom_metadata={
                 "user_id": user_id,
                 "session_id": session_id,
-                "agent_name": agent_name,
             }
         ) as (_, _, wrapper):
             response: ChatResponse = await wrapper(model.arun, messages=messages)
@@ -231,11 +230,10 @@ async def comment_analyze(
 
     async with TM.trace_span(
         span_name="CommentIQ",
-        span_type="LLM_AGENT_CALL",
+        span_type="HGGPT",
         custom_metadata={
             "user_id": user_id,
             "session_id": session_id,
-            "agent_name": "CommentIQ",
         }
     ) as (_, _, wrapper):
         response: ChatCompletion = await wrapper(xai_llm.arun, messages=messages)

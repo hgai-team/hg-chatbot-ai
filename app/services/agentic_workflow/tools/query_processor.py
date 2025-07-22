@@ -95,14 +95,14 @@ class QueryProcessingTool:
                     self.eval_agent.intent_synthesis(
                     chat_messages=analysis_messages,
                     user_id=user_id, session_id=session_id, func=self.llm_arunner,
-                    agent_name="intent_synthesizer"
+                    agent_name="intent_synthesizer", bot_name=self.bot_name
                 )
             ),
             "breakdown": asyncio.create_task(
                     self.query_analyzer.query_preprocess(
                     query=original_query,
                     user_id=user_id, session_id=session_id, func=self.llm_arunner,
-                    agent_name="query_preprocessor"
+                    agent_name="query_preprocessor", bot_name=self.bot_name
                 )
             )
         }
@@ -130,7 +130,8 @@ class QueryProcessingTool:
                     user_id=user_id,
                     session_id=session_id,
                     func=self.llm_arunner,
-                    agent_name="keyword_extractor"
+                    agent_name="keyword_extractor",
+                    bot_name=self.bot_name
                 )
                 keywords_per_query = []
                 if isinstance(keywords_result, list) and len(keywords_result) == len(all_queries_to_process):

@@ -137,9 +137,9 @@ class GenBotService(BaseBotService):
                 "session_id": session_id,
             }
         ) as (trace_id, span_id, wrapper):
-            response: ChatResponse = await wrapper(self.main_llm.arun, messages=inal_messages)
+            response: ChatCompletion = await wrapper(self.xai_llm.arun, messages=inal_messages)
 
-        return response.message.content
+        return response
 
     async def process_chat_request(
         self,
@@ -200,9 +200,12 @@ class GenBotService(BaseBotService):
                     status=ChatStatus.FINISHED.value
                 )
                 return
-
-            response: ChatCompletion = await self.xai_llm.arun(
-                messages=initial_messages + [ChatMessage(role=MessageRole.USER, content=query_text)]
+            
+            messages = initial_messages + [ChatMessage(role=MessageRole.USER, content=query_text)]
+            response: ChatCompletion = await self._get_response(
+                inal_messages=messages,
+                user_id=user_id,
+                session_id=session_id, agent_name=self.bot_name
             )
 
             await self._update_chat(

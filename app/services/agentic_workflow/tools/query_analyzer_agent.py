@@ -38,18 +38,18 @@ class QueryAnalyzerAgentTool:
         session_id: str,
         func: Callable,
         agent_name: str,
-        fallback: Callable[[Union[str, List[str]]], Any]
+        fallback: Callable[[Union[str, List[str]]], Any],
+        bot_name: str
     ) -> Any:
         agent_config = self._get_agent_config(agent_name)
 
         try:
             async with TM.trace_span(
-                span_name=f"{func.__name__}_{agent_name}",
-                span_type="LLM_AGENT_CALL",
+                span_name=agent_name,
+                span_type=bot_name,
                 custom_metadata={
                     "user_id": user_id,
                     "session_id": session_id,
-                    "agent_name": agent_name,
                 }
             ) as (trace_id, span_id, wrapper):
 
@@ -74,7 +74,8 @@ class QueryAnalyzerAgentTool:
         user_id: str,
         session_id: str,
         func: Callable,
-        agent_name: str
+        agent_name: str,
+        bot_name: str = "VaHaCha"
     ) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         def fallback(qs):
             if isinstance(qs, list):
@@ -87,7 +88,8 @@ class QueryAnalyzerAgentTool:
             session_id=session_id,
             func=func,
             agent_name=agent_name,
-            fallback=fallback
+            fallback=fallback,
+            bot_name=bot_name
         )
 
     async def query_preprocess(
@@ -96,7 +98,8 @@ class QueryAnalyzerAgentTool:
         user_id: str,
         session_id: str,
         func: Callable,
-        agent_name: str
+        agent_name: str,
+        bot_name: str = "VaHaCha"
     ) -> Dict[str, Any]:
         def fallback(q):
             return {"query": q, "sub_queries": []}
@@ -107,5 +110,6 @@ class QueryAnalyzerAgentTool:
             session_id=session_id,
             func=func,
             agent_name=agent_name,
-            fallback=fallback
+            fallback=fallback,
+            bot_name=bot_name
         )
