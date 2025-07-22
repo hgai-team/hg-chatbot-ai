@@ -267,10 +267,12 @@ class ExcelReader(BaseReader):
                     if headers[cell_idx].lower() in extra_info_include:
                         if not cell_text:
                             text = False
-                        if cell_text == '1':
-                            text = True
-                        elif cell_text:
-                            text = cell_text
+                        try:
+                            if float(cell_text) == 1.0:
+                                text = True
+                        except:
+                            if cell_text:
+                                text = cell_text
                         to_extra_info[headers[cell_idx].lower()] = text.lower() if isinstance(text, str) else text
                         
                     if cell_text and headers[cell_idx].lower() not in text_exclude:
