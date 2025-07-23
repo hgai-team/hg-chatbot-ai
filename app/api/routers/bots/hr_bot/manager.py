@@ -25,6 +25,7 @@ from .handlers.chat import (
 from .handlers.files import (
     hr_get_files_metadata,
     hr_delete_file,
+    hr_get_file,
     hr_ocr_pdf_to_md
 )
 
@@ -78,7 +79,7 @@ class HrBotManager(BaseManager):
     # File
     async def get_files_metadata(
         self,
-        document_type: DocumentType = DocumentType.CHATBOT
+        document_type: DocumentType
     ):
         response = await hr_get_files_metadata(
             bot_service=self.hr_bot,
@@ -91,6 +92,16 @@ class HrBotManager(BaseManager):
         file_id: UUID
     ):
         response = await hr_delete_file(
+            bot_service=self.hr_bot,
+            file_id=file_id
+        )
+        return response
+
+    async def get_file(
+        self,
+        file_id: UUID
+    ):
+        response = await hr_get_file(
             bot_service=self.hr_bot,
             file_id=file_id
         )

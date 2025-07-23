@@ -1,7 +1,7 @@
 import uuid
 import pandas as pd
 
-from datetime import timezone
+from datetime import timezone, datetime
 from zoneinfo import ZoneInfo
 from uuid import UUID
 from pathlib import Path
@@ -26,17 +26,16 @@ from api.routers.bots.tools.files import (
     get_file_info,
     get_files_info,
     delete_file_info,
+    update_file_info
 )
 
 from api.schema import DocumentType, FileInfo, UserInfo
 
 from services.agentic_workflow.bots.ops_bot import OpsBotService
 
-from core.parsers import parse_file
-
 async def ops_get_files_metadata(
     bot_service: OpsBotService,
-    document_type: DocumentType = DocumentType.CHATBOT
+    document_type: DocumentType
 ):
     files_info = await get_files_info(
         bot_name=bot_service.bot_name,
@@ -66,6 +65,30 @@ async def ops_delete_file(
     )
 
     await delete_file_info(file_id)
+
+    return response
+
+async def ops_get_file(
+    bot_service: OpsBotService,
+    file_id: UUID,
+):
+    if not await is_file_exists(file_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found."
+        )
+
+    file_info: FileInfo = await get_file_info(file_id)
+
+    response = await bot_service.file_processor.get_file_data(
+        file_name=file_info.file_name,
+        document_type=file_info.document_type
+    )
+
+    await update_file_info(
+        file_id=file_info.id,
+        last_accessed_at=datetime.now(timezone.utc),
+    )
 
     return response
 
@@ -110,11 +133,11 @@ async def ops_upload_excel_user_infos(
     contents = await file.read()
     with BytesIO(contents) as buffer:
         df = pd.read_excel(buffer)
-        
+
     BOT_SAVE_PATH = Path("./data") / bot_service.bot_name / document_type.name
     BOT_SAVE_PATH.mkdir(parents=True, exist_ok=True)
-    
-    _, file_stream = await parse_file(file)
+
+    file_stream = BytesIO(contents)
     await bot_service.file_processor._save_file(
         file_stream=file_stream,
         file_name=file_name,

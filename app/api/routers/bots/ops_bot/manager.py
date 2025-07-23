@@ -19,6 +19,7 @@ from .handlers.chat import (
 from .handlers.files import (
     ops_get_files_metadata,
     ops_delete_file,
+    ops_get_file,
     ops_upload_excel,
     ops_upload_excel_user_infos
 )
@@ -98,7 +99,7 @@ class OpsBotManager(BaseManager):
     # File
     async def get_files_metadata(
         self,
-        document_type: DocumentType = DocumentType.CHATBOT
+        document_type: DocumentType
     ):
         response = await ops_get_files_metadata(
             bot_service=self.ops_bot,
@@ -111,6 +112,16 @@ class OpsBotManager(BaseManager):
         file_id: UUID
     ):
         response = await ops_delete_file(
+            bot_service=self.ops_bot,
+            file_id=file_id
+        )
+        return response
+
+    async def get_file(
+        self,
+        file_id: UUID
+    ):
+        response = await ops_get_file(
             bot_service=self.ops_bot,
             file_id=file_id
         )
@@ -320,7 +331,7 @@ class OpsBotManager(BaseManager):
             "status": 200,
             "data": data
         }
-    
+
     async def get_users(
         self,
     ):

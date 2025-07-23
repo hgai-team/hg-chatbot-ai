@@ -1,13 +1,18 @@
+import logging
+logger = logging.getLogger(__name__)
+
 import io
 import aiofiles
 import asyncio
-import logging
-logger = logging.getLogger(__name__)
+import mimetypes
+import urllib.parse
 
 from pathlib import Path
 from typing import Callable, Union
 
-from fastapi import HTTPException, UploadFile
+from fastapi import HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
+
 from openai.types.chat.chat_completion import ChatCompletion
 from llama_index.core.llms import ChatResponse
 
@@ -416,6 +421,40 @@ class FileProcessorTool:
                 status_code=500,
                 detail=f"Error deleting file data: {str(e)}"
             )
+
+    async def get_file_data(
+        self,
+        file_name: str,
+        document_type: DocumentType,
+    ):
+        DEFAULT_SAVE_PATH = Path("./data")
+        DEFAULT_SAVE_PATH.mkdir(parents=True, exist_ok=True)
+
+        BOT_SAVE_PATH = DEFAULT_SAVE_PATH / self.bot_name / document_type.name
+        BOT_SAVE_PATH.mkdir(parents=True, exist_ok=True)
+
+        file_path = BOT_SAVE_PATH / file_name
+
+        if not file_path.exists() or not file_path.is_file():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="File doesn't exists"
+            )
+
+        media_type, _ = mimetypes.guess_type(str(file_path))
+        media_type = media_type or "application/octet-stream"
+
+        filename_quoted = urllib.parse.quote(file_name)
+
+        content_disposition = (
+            f"inline; filename*=UTF-8''{filename_quoted}"
+        )
+
+        return FileResponse(
+            path=str(file_path),
+            media_type=media_type,
+            headers={"Content-Disposition": content_disposition}
+        )
 
     async def store_docs(
         self,

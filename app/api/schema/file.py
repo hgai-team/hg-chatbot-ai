@@ -55,3 +55,12 @@ class FileInfo(SQLModel, table=True):
             index=True
         )
     )
+
+    last_accessed_at: Optional[datetime] = Field(
+        sa_column=Column(
+            TIMESTAMP(timezone=True),
+            nullable=True,
+            index=True,
+            server_default=None,
+        )
+    )

@@ -1,14 +1,12 @@
-from uuid import uuid4
+from uuid import uuid4, UUID
 from sqlmodel import select, update, delete
-
-from uuid import UUID
 
 from api.schema import (
     FileInfo
 )
 from core.storages.client import PostgresEngineManager as PEM
 
-from typing import List
+from typing import List, Any
 
 async def create_file_info(
     email: str,
@@ -54,13 +52,18 @@ async def get_files_info(
     bot_name: str,
     document_type: str
 ):
-    async with PEM.get_session() as session:
-        result = await session.exec(
-            select(FileInfo).where(
-                FileInfo.bot_name == bot_name,
-                FileInfo.document_type == document_type
-            )
+    if document_type:
+        stmt = select(FileInfo).where(
+            FileInfo.bot_name == bot_name,
+            FileInfo.document_type == document_type
         )
+    else:
+        stmt = select(FileInfo).where(
+            FileInfo.bot_name == bot_name,
+        )
+
+    async with PEM.get_session() as session:
+        result = await session.exec(stmt)
         return result.all()
 
 async def delete_file_info(
@@ -73,3 +76,18 @@ async def delete_file_info(
             )
         )
         await session.commit()
+
+async def update_file_info(
+    file_id: UUID,
+    **kwargs: Any,
+):
+    if not kwargs:
+        raise ValueError("You must pass at least 1 field to update")
+
+    async with PEM.get_session() as session:
+        await session.exec(
+            update(FileInfo)
+            .where(FileInfo.id == file_id)
+            .values(**kwargs)
+            .execution_options(synchronize_session="fetch")
+        )

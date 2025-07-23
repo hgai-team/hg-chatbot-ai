@@ -1,3 +1,6 @@
+import requests
+import asyncio
+
 from google import genai
 from google.genai import types
 
@@ -8,6 +11,26 @@ from core.parsers import json_parser
 
 from services.agentic_workflow.tools import PromptProcessorTool as PPT
 from services import get_settings_cached, get_google_genai_llm
+
+async def count_video_tokens(
+    video_url: str,
+    start_offset: str,
+    end_offset: str,
+    fps: int,
+):
+    if start_offset is not None and end_offset is not None:
+        total_tokens = (int(end_offset[:-1]) - int(start_offset[:-1])) * int(fps) * 300
+    else:
+        downstream = "http://crawl-comment:5000/api/video/check"
+        params = {"url": video_url}
+        resp = await asyncio.to_thread(requests.post, downstream, params=params, timeout=5)
+        js_resp = resp.json()
+        if js_resp["exists"]:
+            total_tokens = js_resp["video_info"]["duration_seconds"] * int(fps) * 300
+        else:
+            total_tokens = 0
+
+    return total_tokens
 
 async def _analyze(
     video_analyzer: dict,
@@ -21,7 +44,8 @@ async def _analyze(
         api_key=get_settings_cached().GOOGLEAI_API_KEY,
     )
 
-    response = client.models.generate_content(
+    response = await asyncio.to_thread(
+        client.models.generate_content,
         model=get_settings_cached().GOOGLEAI_MODEL_THINKING,
         config=types.GenerateContentConfig(
             system_instruction="\n".join(video_analyzer.values()),
@@ -78,28 +102,36 @@ async def video_analyze(
     json_resp = json_parser(response.message.content)
     if "status" in json_resp:
         if json_resp['status'] == 'READY_FOR_ANALYSIS':
-            yield {'_type': 'response', 'text': f"{json_resp['response']}\n"}
+            total_tokens = await count_video_tokens(
+                video_url=json_resp['video_url'],
+                start_offset=json_resp['analysis_params']['start_offset'],
+                end_offset=json_resp['analysis_params']['end_offset'],
+                fps=json_resp['analysis_params']['fps']
+            )
 
-            async with TM.trace_span(
-                span_name="video_analyzer",
-                span_type="HGGPT",
-                custom_metadata={
-                    "user_id": user_id,
-                    "session_id": session_id,
-                    "agent_name": "video_analyzer",
-                }
-            ) as (_, _, wrapper):
-                response = await wrapper(
-                    _analyze,
-                    video_analyzer=video_analyzer,
-                    video_url=json_resp['video_url'],
-                    user_request=json_resp['user_request'],
-                    start_offset=json_resp['analysis_params']['start_offset'],
-                    end_offset=json_resp['analysis_params']['end_offset'],
-                    fps=json_resp['analysis_params']['fps']
-                )
+            if total_tokens > 0 and total_tokens < 512000:
+                yield {'_type': 'response', 'text': f"{json_resp['response']}\n"}
 
-            yield {'_type': 'response', 'text': response.text}
+                async with TM.trace_span(
+                    span_name="video_analyzer",
+                    span_type="HGGPT",
+                    custom_metadata={
+                        "user_id": user_id,
+                        "session_id": session_id,
+                        "agent_name": "video_analyzer",
+                    }
+                ) as (_, _, wrapper):
+                    response = await wrapper(
+                        _analyze,
+                        video_analyzer=video_analyzer,
+                        video_url=json_resp['video_url'],
+                        user_request=json_resp['user_request'],
+                        start_offset=json_resp['analysis_params']['start_offset'],
+                        end_offset=json_resp['analysis_params']['end_offset'],
+                        fps=json_resp['analysis_params']['fps']
+                    )
+
+                yield {'_type': 'response', 'text': response.text}
 
         else:
             yield {'_type': 'response', 'text': response.message.content}
