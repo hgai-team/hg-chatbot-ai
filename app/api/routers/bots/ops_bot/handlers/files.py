@@ -35,17 +35,29 @@ from services.agentic_workflow.bots.ops_bot import OpsBotService
 
 async def ops_get_files_metadata(
     bot_service: OpsBotService,
-    document_type: DocumentType
+    document_type: DocumentType,
+    q: str,
+    limit: int,
+    page_index: int,
+    file_ext: list[str],
+    sort_field: str,
+    sort_order: int
 ):
-    files_info = await get_files_info(
+    resp = await get_files_info(
         bot_name=bot_service.bot_name,
-        document_type=document_type
+        document_type=document_type,
+        q=q,
+        limit=limit,
+        page_index=page_index,
+        file_ext=file_ext,
+        sort_field=sort_field,
+        sort_order=sort_order
     )
 
-    for file_info in files_info:
+    for file_info in resp['items']:
         file_info.uploaded_at = file_info.uploaded_at.replace(tzinfo=timezone.utc).astimezone(ZoneInfo("Asia/Bangkok"))
 
-    return files_info
+    return resp
 
 async def ops_delete_file(
     bot_service: OpsBotService,

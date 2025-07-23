@@ -3,7 +3,7 @@ from sqlmodel import create_engine, Session, SQLModel
 
 from api.routers import (
     bots_router,
-
+    files_router,
     auth_router,
 )
 
@@ -29,7 +29,7 @@ def health_check():
     return {"status": 200}
 
 app.include_router(bots_router)
-
+app.include_router(files_router)
 app.include_router(auth_router)
 
 

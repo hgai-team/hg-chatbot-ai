@@ -188,19 +188,31 @@ async def chat_user_stream(
         )
 
 # File API Endpoints
-@app.get(
+@app.post(
     "/{bot_name}/files",
     dependencies=[Depends(validate_auth)],
     tags=['Files']
 )
 async def get_files_metadata(
     bot_name: str = Path(...),
-    document_type: DocumentType = Query(None)
+    document_type: DocumentType = Body(None),
+    q: str = Body(None),
+    limit: int = Body(10, ge=1, le=1000),
+    page_index: int = Body(1),
+    file_ext: list[str] = Body([], description=".xlsx, .pdf, ..."),
+    sort_field: str = Body(None),
+    sort_order: int = Body(None, description="Sort order (Asc = 1, Desc = -1)"),
 ):
     bot_manager: BaseManager = get_bot_manager(bot_name)
     try:
         response = await bot_manager.get_files_metadata(
-            document_type=document_type
+            document_type=document_type,
+            q=q,
+            limit=limit,
+            page_index=page_index,
+            file_ext=file_ext,
+            sort_field=sort_field,
+            sort_order=sort_order
         )
         return response
 

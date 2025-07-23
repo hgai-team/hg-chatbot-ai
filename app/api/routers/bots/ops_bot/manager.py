@@ -99,11 +99,23 @@ class OpsBotManager(BaseManager):
     # File
     async def get_files_metadata(
         self,
-        document_type: DocumentType
+        document_type: DocumentType,
+        q: str,
+        limit: int,
+        page_index: int,
+        file_ext: list[str],
+        sort_field: str,
+        sort_order: int
     ):
         response = await ops_get_files_metadata(
             bot_service=self.ops_bot,
-            document_type=document_type
+            document_type=document_type,
+            q=q,
+            limit=limit,
+            page_index=page_index,
+            file_ext=file_ext,
+            sort_field=sort_field,
+            sort_order=sort_order
         )
         return response
 

@@ -27,42 +27,7 @@ async def lifespan(app: FastAPI):
     trace_store = PostgresTraceStore()
     TM.init_tracer(storage_writer=trace_store.upsert_span)
 
-    if get_api_settings().ENV == 'pro':
-        from core.discord.bot import message_queue, workers, thread_pool
-
-        bot_task = asyncio.create_task(client.start(get_core_settings().DISCORD_BOT_TOKEN))
-        logger.info("Discord bot started")
-
     yield
-
-    if get_api_settings().ENV == 'pro':
-
-        logger.info("Shutting down Discord bot...")
-        if client.is_ready():
-            await client.close()
-
-        logger.info("Waiting for message queue to finish processing...")
-        try:
-            await asyncio.wait_for(message_queue.join(), timeout=30)
-        except asyncio.TimeoutError:
-            logger.warning("Timed out waiting for message queue to finish")
-
-        logger.info("Cancelling message queue workers...")
-        for worker in workers:
-            worker.cancel()
-
-        await asyncio.gather(*workers, return_exceptions=True)
-
-        logger.info("Shutting down thread pool...")
-        thread_pool.shutdown(wait=False)
-
-        if not bot_task.done():
-            logger.info("Cancelling Discord bot task...")
-            bot_task.cancel()
-            try:
-                await bot_task
-            except asyncio.CancelledError:
-                logger.info("Discord bot task cancelled")
 
 disable_docs = get_api_settings().ENV == "pro"
 app = FastAPI(
