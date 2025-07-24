@@ -237,12 +237,12 @@ async def get_files_metadata(
 )
 async def delete_file(
     bot_name: str = Path(...),
-    file_id: UUID = Body(..., embed=True),
+    file_ids: list[UUID] = Body(..., embed=True),
 ):
     bot_manager: BaseManager = get_bot_manager(bot_name)
     try:
         response = await bot_manager.delete_file(
-            file_id=file_id
+            file_ids=file_ids
         )
         return response
         # return FileResponse(**response)

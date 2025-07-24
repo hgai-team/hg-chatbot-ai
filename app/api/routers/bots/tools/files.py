@@ -1,3 +1,8 @@
+import asyncio
+
+from datetime import timezone, datetime
+from zoneinfo import ZoneInfo
+
 from math import ceil
 from uuid import uuid4, UUID
 from sqlmodel import (
@@ -12,9 +17,11 @@ from api.schema import (
 )
 
 from core.storages.client import PostgresEngineManager as PEM
+from services.agentic_workflow.tools.files_processor import FileProcessorTool
 
 from typing import List, Any
 
+# File Info
 async def create_file_info(
     email: str,
     bot_name: str,
@@ -163,3 +170,106 @@ async def update_file_info(
             .values(**kwargs)
             .execution_options(synchronize_session="fetch")
         )
+
+# File
+async def get_files_metadata(
+    bot_name: str,
+    document_type: DocumentType,
+    q: str,
+    limit: int,
+    page_index: int,
+    file_ext: list[str],
+    sort_field: str,
+    sort_order: int
+):
+    resp = await get_files_info(
+        bot_name=bot_name,
+        document_type=document_type,
+        q=q,
+        limit=limit,
+        page_index=page_index,
+        file_ext=file_ext,
+        sort_field=sort_field,
+        sort_order=sort_order
+    )
+
+    for file_info in resp['items']:
+        file_info.uploaded_at = file_info.uploaded_at.replace(tzinfo=timezone.utc).astimezone(ZoneInfo("Asia/Bangkok"))
+
+    return resp
+
+async def get_file(
+    file_processor: FileProcessorTool,
+    file_id: UUID,
+):
+    if not await is_file_exists(file_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found."
+        )
+
+    file_info: FileInfo = await get_file_info(file_id)
+
+    response = await file_processor.get_file_data(
+        file_name=file_info.file_name,
+        document_type=file_info.document_type
+    )
+
+    await update_file_info(
+        file_id=file_info.id,
+        last_accessed_at=datetime.now(timezone.utc),
+    )
+
+    return response
+
+async def delete_file(
+    file_processor: FileProcessorTool,
+    file_ids: list[UUID],
+):
+    tasks_info = [get_file_info(file_id) for file_id in file_ids]
+    file_infos = await asyncio.gather(*tasks_info, return_exceptions=True)
+
+    user_info_files: list[str] = []
+    file_ids_to_delete: list[UUID] = []
+    file_names_to_delete: list[str] = []
+    delete_tasks = []
+
+    for fi in file_infos:
+        if isinstance(fi, Exception):
+            continue
+
+        if fi.document_type == DocumentType.USER_INFO:
+            user_info_files.append(fi.file_name)
+        else:
+            file_ids_to_delete.append(fi.id)
+            file_names_to_delete.append(fi.file_name)
+            delete_tasks.append(
+                file_processor.delete_file_data(
+                    file_name=fi.file_name,
+                    document_type=fi.document_type
+                )
+            )
+
+    results = await asyncio.gather(*delete_tasks, return_exceptions=True)
+
+    deleted_success_ids: list[UUID] = []
+    deleted_failed_ids:  list[UUID] = []
+    delete_failed_names: list[str] = []
+
+    for idx, res in enumerate(results):
+        fid = file_ids_to_delete[idx]
+        fname = file_names_to_delete[idx]
+
+        if isinstance(res, Exception):
+            deleted_failed_ids.append(fid)
+            delete_failed_names.append(fname)
+        else:
+            deleted_success_ids.append(fid)
+
+    delete_file_info_tasks = [delete_file_info(file_id) for file_id in deleted_success_ids]
+    _ = await asyncio.gather(*delete_file_info_tasks, return_exceptions=True)
+
+    return {
+        "not_allowed_to_delete": user_info_files,
+        "delete_failed_names": delete_failed_names
+    }

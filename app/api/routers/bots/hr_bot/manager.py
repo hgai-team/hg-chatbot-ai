@@ -23,10 +23,11 @@ from .handlers.chat import (
 )
 
 from .handlers.files import (
-    hr_get_files_metadata,
-    hr_delete_file,
-    hr_get_file,
-    hr_ocr_pdf_to_md
+    hr_ocr_pdf_to_md,
+
+    get_files_metadata,
+    get_file,
+    delete_file,
 )
 
 from .handlers.traces import (
@@ -87,8 +88,8 @@ class HrBotManager(BaseManager):
         sort_field: str,
         sort_order: int
     ):
-        response = await hr_get_files_metadata(
-            bot_service=self.hr_bot,
+        response = await get_files_metadata(
+            bot_name=self.hr_bot.bot_name,
             document_type=document_type,
             q=q,
             limit=limit,
@@ -101,11 +102,11 @@ class HrBotManager(BaseManager):
 
     async def delete_file(
         self,
-        file_id: UUID
+        file_ids: list[UUID]
     ):
-        response = await hr_delete_file(
-            bot_service=self.hr_bot,
-            file_id=file_id
+        response = await delete_file(
+            file_processor=self.hr_bot.file_processor,
+            file_ids=file_ids
         )
         return response
 
@@ -113,8 +114,8 @@ class HrBotManager(BaseManager):
         self,
         file_id: UUID
     ):
-        response = await hr_get_file(
-            bot_service=self.hr_bot,
+        response = await get_file(
+            file_processor=self.hr_bot.file_processor,
             file_id=file_id
         )
         return response

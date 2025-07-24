@@ -17,11 +17,12 @@ from .handlers.chat import (
 )
 
 from .handlers.files import (
-    ops_get_files_metadata,
-    ops_delete_file,
-    ops_get_file,
     ops_upload_excel,
-    ops_upload_excel_user_infos
+    ops_upload_excel_user_infos,
+
+    get_files_metadata,
+    get_file,
+    delete_file,
 )
 
 from .handlers.user_info import (
@@ -107,8 +108,8 @@ class OpsBotManager(BaseManager):
         sort_field: str,
         sort_order: int
     ):
-        response = await ops_get_files_metadata(
-            bot_service=self.ops_bot,
+        response = await get_files_metadata(
+            bot_name=self.ops_bot.bot_name,
             document_type=document_type,
             q=q,
             limit=limit,
@@ -121,11 +122,11 @@ class OpsBotManager(BaseManager):
 
     async def delete_file(
         self,
-        file_id: UUID
+        file_ids: list[UUID]
     ):
-        response = await ops_delete_file(
-            bot_service=self.ops_bot,
-            file_id=file_id
+        response = await delete_file(
+            file_processor=self.ops_bot.file_processor,
+            file_ids=file_ids
         )
         return response
 
@@ -133,8 +134,8 @@ class OpsBotManager(BaseManager):
         self,
         file_id: UUID
     ):
-        response = await ops_get_file(
-            bot_service=self.ops_bot,
+        response = await get_file(
+            file_processor=self.ops_bot.file_processor,
             file_id=file_id
         )
         return response
