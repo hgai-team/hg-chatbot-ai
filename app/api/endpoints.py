@@ -4,6 +4,7 @@ from sqlmodel import create_engine, Session, SQLModel
 from api.routers import (
     bots_router,
     files_router,
+    traces_router,
     auth_router,
 )
 
@@ -30,6 +31,7 @@ def health_check():
 
 app.include_router(bots_router)
 app.include_router(files_router)
+app.include_router(traces_router)
 app.include_router(auth_router)
 
 

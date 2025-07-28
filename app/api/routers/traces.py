@@ -1,0 +1,58 @@
+import logging
+logger = logging.getLogger(__name__)
+
+import os
+import io
+import requests
+import timeit
+
+from datetime import datetime, timedelta, timezone
+from uuid import UUID
+from pydantic import EmailStr
+
+from typing import Optional, Any, List, Dict
+
+from fastapi import (
+    APIRouter, HTTPException, status,
+    Depends, Path, File, Query, Body, Form
+)
+
+from api.security.api_credentials import validate_auth
+from api.routers.bots.tools.traces import (
+    get_all_traces
+)
+
+app = APIRouter(
+    prefix="/bots",
+)
+
+@app.post(
+    "/traces",
+    dependencies=[Depends(validate_auth)],
+    tags=['Traces']
+)
+async def fetch_all_traces(
+    limit: int = Body(10, ge=1, le=1000),
+    page_index: int = Body(1),
+    sort_field: str = Body(None),
+    sort_order: int = Body(-1, description="Sort order (Asc = 1, Desc = -1)"),
+    filters: Optional[List[Dict[str, Any]]] = Body(None, description="Dictionary of multiple field-value pairs to filter by (optional). Supported operators: eq, ne, like, in, gt, gte, lt, lte")
+):
+    try:
+        resp = await get_all_traces(
+            limit=limit,
+            page_index=page_index,
+            sort_field=sort_field,
+            sort_order=sort_order,
+            filters=filters
+        )
+        return resp
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"An unhandled error occurred in get_all_traces: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )

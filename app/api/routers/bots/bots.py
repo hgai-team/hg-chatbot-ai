@@ -33,8 +33,6 @@ app = APIRouter(
     prefix="/bots",
 )
 
-logger = logging.getLogger(__name__)
-
 # Chat API Endpoints
 @app.post(
     "/{bot_name}/chat/stop",
@@ -806,37 +804,6 @@ async def agent_evaluation(
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail=f"Bot '{bot_name}' does not support agent_evaluation feature"
-        )
-    except Exception as e:
-        logger.error(f"An unhandled error occurred in chat for bot '{bot_name}': {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
-        )
-
-# Trace API Endpoints
-@app.get(
-    "/{bot_name}/traces",
-    dependencies=[Depends(validate_auth)],
-    tags=['Traces']
-)
-async def get_all_traces(
-    bot_name: str = Path(...),
-):
-    try:
-        bot_manager: BaseManager = get_bot_manager(bot_name)
-
-        response = await bot_manager.get_all_traces()
-
-        return response
-
-    except HTTPException:
-        raise
-    except AttributeError as e:
-        logger.error(f"Attribute error in get_all_traces for bot '{bot_name}': {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail=f"Bot '{bot_name}' does not support get_all_traces feature"
         )
     except Exception as e:
         logger.error(f"An unhandled error occurred in chat for bot '{bot_name}': {e}", exc_info=True)

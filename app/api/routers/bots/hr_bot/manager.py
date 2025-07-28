@@ -30,10 +30,6 @@ from .handlers.files import (
     delete_file,
 )
 
-from .handlers.traces import (
-    hr_get_all_traces
-)
-
 
 class HrBotManager(BaseManager):
     def __init__(
@@ -302,10 +298,3 @@ class HrBotManager(BaseManager):
             user_id=user_id,
         )
         return sum([len(chat) for chat in his_sessions])
-
-    # Traces
-    async def get_all_traces(
-        self,
-    ):
-        resp = await hr_get_all_traces()
-        return resp[-10:]
