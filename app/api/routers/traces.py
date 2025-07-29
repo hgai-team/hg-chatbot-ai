@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 from pydantic import EmailStr
 
-from typing import Optional, Any, List, Dict
+from typing import Optional, Any, List, Dict, Literal
 
 from fastapi import (
     APIRouter, HTTPException, status,
@@ -19,7 +19,9 @@ from fastapi import (
 
 from api.security.api_credentials import validate_auth
 from api.routers.bots.tools.traces import (
-    get_all_traces
+    get_all_traces,
+    get_model_usage_statistics,
+    get_model_usage_for_user
 )
 
 app = APIRouter(
@@ -35,7 +37,7 @@ async def fetch_all_traces(
     limit: int = Body(10, ge=1, le=1000),
     page_index: int = Body(1),
     sort_field: str = Body(None),
-    sort_order: int = Body(-1, description="Sort order (Asc = 1, Desc = -1)"),
+    sort_order: Literal[-1, 1] = Body(-1, description="Sort order (Asc = 1, Desc = -1)"),
     filters: Optional[List[Dict[str, Any]]] = Body(None, description="Dictionary of multiple field-value pairs to filter by (optional). Supported operators: eq, ne, like, in, gt, gte, lt, lte")
 ):
     try:
@@ -52,6 +54,62 @@ async def fetch_all_traces(
         raise
     except Exception as e:
         logger.error(f"An unhandled error occurred in get_all_traces: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+        
+@app.post(
+    "/traces/statistics",
+    dependencies=[Depends(validate_auth)],
+    tags=['Traces']
+)
+async def fetch_traces_statistics(
+    filters: Optional[List[Dict[str, Any]]] = Body(
+        None, 
+        description="Dictionary of multiple field-value pairs to filter by (optional). Supported operators: eq, ne, like, in, gt, gte, lt, lte",
+        embed=True
+    )
+):
+    try:
+        resp = await get_model_usage_statistics(
+            filters=filters
+        )
+        return resp
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"An unhandled error occurred in fetch_traces_statistics: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+        
+@app.post(
+    "/traces/statistics/user",
+    dependencies=[Depends(validate_auth)],
+    tags=['Traces']
+)
+async def fetch_traces_statistics_for_user(
+    user_id: UUID = Body(...),
+    filters: Optional[List[Dict[str, Any]]] = Body(
+        None, 
+        description="Dictionary of multiple field-value pairs to filter by (optional). Supported operators: eq, ne, like, in, gt, gte, lt, lte",
+        embed=True
+    )
+):
+    try:
+        resp = await get_model_usage_for_user(
+            user_id=user_id,
+            filters=filters
+        )
+        return resp
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"An unhandled error occurred in fetch_traces_statistics: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"

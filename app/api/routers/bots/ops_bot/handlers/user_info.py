@@ -155,7 +155,7 @@ async def search_user_infos(
         total_pages = (total_count + limit - 1) // limit if total_count > 0 else 0
         
         if page_index > total_pages and total_pages >= 0:
-            raise ValueError(f"page_index ({page_index}) cannot be greater than or equal to total pages ({total_pages})")
+            raise ValueError(f"page_index ({page_index}) cannot be greater than to total pages ({total_pages})")
         
         # Apply sorting
         if sort_field:
