@@ -9,6 +9,8 @@ from uuid import UUID
 from google import genai
 from google.genai import types
 
+from typing import Optional, Any, List, Dict
+
 from .handlers.chat import (
     ops_chat_stop,
     ops_chat,
@@ -27,7 +29,10 @@ from .handlers.files import (
 
 from .handlers.user_info import (
     create_user_info,
-    get_all_user_info,
+    update_user_info,
+    delete_user_info,
+    get_unique_values,
+    search_user_infos,
     get_user_info,
     aggregated_user_info
 )
@@ -345,10 +350,58 @@ class OpsBotManager(BaseManager):
             "data": data
         }
 
-    async def get_users(
+    async def update_users(
         self,
+        users
     ):
-        data = await get_all_user_info()
+        data = await update_user_info(input_=users)
+
+        return {
+            "status": 200,
+            "data": data
+        }
+        
+    async def delete_users(
+        self,
+        ids
+    ):
+        data = await delete_user_info(input_=ids)
+
+        return {
+            "status": 200,
+            "data": data
+        }
+        
+    async def get_distinct_user_values(
+        self,
+        column_name: str,
+        filters: Optional[List[Dict[str, Any]]] = None 
+    ):
+        data = await get_unique_values(
+            column_name=column_name,
+            filters=filters
+        )
+
+        return {
+            "status": 200,
+            "data": data
+        }
+    
+    async def search_users(
+        self,
+        limit: int,
+        page_index: int,
+        sort_field: str,
+        sort_order: int,
+        filters: Optional[List[Dict[str, Any]]] = None 
+    ):
+        data = await search_user_infos(
+            limit=limit,
+            page_index=page_index,
+            sort_field=sort_field,
+            sort_order=sort_order,
+            filters=filters
+        )
 
         return {
             "status": 200,

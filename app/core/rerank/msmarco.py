@@ -16,6 +16,15 @@ class MSMarcoReranker(BaseReranker):
     _predict_lock = asyncio.Semaphore(1)
 
     @classmethod
+    def _cleanup_model(cls):
+        if cls._model is not None:
+            cls._model.to('cpu')
+            del cls._model
+            cls._model = None
+            torch.cuda.empty_cache()
+            gc.collect()
+    
+    @classmethod
     async def rerank(
         cls,
         query: str,
@@ -27,6 +36,9 @@ class MSMarcoReranker(BaseReranker):
             raise RuntimeError("CUDA GPU is required but not available")
 
         name = model_name or cls._model_name
+        
+        if torch.cuda.memory_allocated() > torch.cuda.max_memory_allocated() * 0.8:
+            cls._cleanup_model()
 
         if cls._model is None or (model_name and name != cls._model_name):
             if cls._model is not None:

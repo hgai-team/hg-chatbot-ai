@@ -2,6 +2,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 import asyncio
+import torch, gc
 from api.endpoints import app as api_app
 
 from fastapi import FastAPI
@@ -19,8 +20,16 @@ from contextlib import asynccontextmanager
 
 logger = logging.getLogger("main")
 
+def cleanup_gpu():
+    """Cleanup GPU memory on reload"""
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+        gc.collect()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    cleanup_gpu()
     await create_db_and_tables()
     setup_logging()
 
@@ -28,6 +37,8 @@ async def lifespan(app: FastAPI):
     TM.init_tracer(storage_writer=trace_store.upsert_span)
 
     yield
+    
+    cleanup_gpu()
 
 disable_docs = get_api_settings().ENV == "pro"
 app = FastAPI(

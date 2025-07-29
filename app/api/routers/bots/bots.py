@@ -13,7 +13,7 @@ from fastapi import (
     Depends, Path, File, Query, Body, Form
 )
 from fastapi.responses import StreamingResponse
-from typing import Literal, List
+from typing import Optional, Any, List, Dict, Literal
 
 from pydantic import EmailStr
 
@@ -687,17 +687,123 @@ async def create_users(
             detail="Internal server error"
         )
 
-@app.get(
+@app.put(
     "/{bot_name}/users",
     dependencies=[Depends(validate_auth)],
     tags=['User Info']
 )
-async def get_users(
-    bot_name: str = Path(...)
+async def update_users(
+    bot_name: str = Path(...),
+    users: List[UserInfo] = Body(..., embed=True)
 ):
     bot_manager: BaseManager = get_bot_manager(bot_name)
     try:
-        response = await bot_manager.get_users()
+        response = await bot_manager.update_users(
+            users=users
+        )
+        return response
+    except HTTPException:
+        raise
+    except AttributeError as e:
+        logger.error(f"Attribute error in update_users for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=f"Bot '{bot_name}' does not support update_users feature"
+        )
+    except Exception as e:
+        logger.error(f"An unhandled error occurred in update_users for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+        
+@app.delete(
+    "/{bot_name}/users",
+    dependencies=[Depends(validate_auth)],
+    tags=['User Info']
+)
+async def delete_users(
+    bot_name: str = Path(...),
+    ids: List[UUID] = Body(..., embed=True)
+):
+    bot_manager: BaseManager = get_bot_manager(bot_name)
+    try:
+        response = await bot_manager.delete_users(
+            ids=ids
+        )
+        return response
+    except HTTPException:
+        raise
+    except AttributeError as e:
+        logger.error(f"Attribute error in delete_users for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=f"Bot '{bot_name}' does not support delete_users feature"
+        )
+    except Exception as e:
+        logger.error(f"An unhandled error occurred in delete_users for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
+@app.post(
+    "/{bot_name}/users/unique-values/{column_name}",
+    dependencies=[Depends(validate_auth)],
+    tags=['User Info']
+)
+async def get_distinct_user_values(
+    bot_name: str = Path(...),
+    column_name: str = Path(...),
+    filters: Optional[List[Dict[str, Any]]] = Body(None, 
+    description="Dictionary of multiple field-value pairs to filter by (optional). Supported operators: eq, ne, like, in, gt, gte, lt, lte",
+    embed=True)
+):
+    bot_manager: BaseManager = get_bot_manager(bot_name)
+    try:
+        response = await bot_manager.get_distinct_user_values(
+            column_name=column_name,
+            filters=filters
+        )
+        return response
+    except HTTPException:
+        raise
+    except AttributeError as e:
+        logger.error(f"Attribute error in get_users for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=f"Bot '{bot_name}' does not support get_users feature"
+        )
+    except Exception as e:
+        logger.error(f"An unhandled error occurred in get_users for bot '{bot_name}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
+@app.post(
+    "/{bot_name}/users/search",
+    dependencies=[Depends(validate_auth)],
+    tags=['User Info']
+)
+async def search_users(
+    bot_name: str = Path(...),
+    limit: int = Body(10, ge=1, le=1000),
+    page_index: int = Body(1),
+    sort_field: str = Body(None),
+    sort_order: Literal[1, -1] = Body(-1, description="Sort order (Asc = 1, Desc = -1)"),
+    filters: Optional[List[Dict[str, Any]]] = Body(None, 
+    description="Dictionary of multiple field-value pairs to filter by (optional). Supported operators: eq, ne, like, in, gt, gte, lt, lte")
+):
+    bot_manager: BaseManager = get_bot_manager(bot_name)
+    try:
+        response = await bot_manager.search_users(
+            limit=limit,
+            page_index=page_index,
+            sort_field=sort_field,
+            sort_order=sort_order,
+            filters=filters
+        )
         return response
     except HTTPException:
         raise

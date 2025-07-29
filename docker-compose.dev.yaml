@@ -3,7 +3,14 @@ services:
     image: krntl/hgcb:latest
     container_name: dev-hg-chatbot
 
-    restart: always
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import torch; assert torch.cuda.is_available()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
     env_file:
       - .env
@@ -35,7 +42,7 @@ services:
     image: mongodb/mongodb-community-server:7.0.11-ubuntu2204
     container_name: dev-mongodb-hg-chatbot
 
-    restart: always
+    restart: unless-stopped
 
     ports:
       - "27017:27017"
@@ -59,7 +66,7 @@ services:
     image: qdrant/qdrant:v1.14.1
     container_name: dev-qdrant-hg-chatbot
 
-    restart: always
+    restart: unless-stopped
 
     ports:
       - 6333:6333
@@ -83,7 +90,7 @@ services:
     ports:
       - '5432:5432'
 
-    restart: always
+    restart: unless-stopped
 
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -109,7 +116,7 @@ services:
     image: krntl/crawl-comment:latest
     container_name: dev-crawl-comment
 
-    restart: always
+    restart: unless-stopped
 
     networks:
       - hg-chatbot-network
