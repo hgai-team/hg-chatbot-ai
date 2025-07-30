@@ -18,7 +18,7 @@ async def create_user_info(
 ):
     async with PEM.get_session() as session:
         session.add_all(input_)
-        
+
 async def update_user_info(
     input_: List[UserInfo],
 ):
@@ -36,13 +36,13 @@ async def update_user_info(
                 'department': str(user_info.department).lower() if user_info.department else user_info.department,
                 'metadata_': user_info.metadata_,
             })
-        
+
         await session.run_sync(
             lambda sync_session: sync_session.bulk_update_mappings(
                 UserInfo, update_data
             )
         )
-        
+
 async def delete_user_info(
     input_: List[UUID],
 ):
@@ -56,20 +56,20 @@ async def get_unique_values(
 ) -> List[Any]:
     async with PEM.get_session() as session:
         column = getattr(UserInfo, column_name)
-        
+
         stmt = select(column).distinct().where(column.is_not(None))
-        
+
         if filters:
             for filter_config in filters:
                 field = filter_config.get("field")
                 operator = filter_config.get("operator", "eq")
                 value = filter_config.get("value")
-                
-                if not hasattr(UserInfo, field) or field in ['metadata_', 'id']:
+
+                if not hasattr(UserInfo, field) or field in ['metadata_']:
                     continue
-                    
+
                 field_attr = getattr(UserInfo, field)
-                
+
                 if operator == "eq":
                     stmt = stmt.where(field_attr == value)
                 elif operator == "ne":
@@ -86,9 +86,9 @@ async def get_unique_values(
                     stmt = stmt.where(field_attr < value)
                 elif operator == "lte":
                     stmt = stmt.where(field_attr <= value)
-        
-        result = await session.execute(stmt)
-        
+
+        result = await session.exec(stmt)
+
         return [row[0] for row in result.fetchall()]
 
 async def search_user_infos(
@@ -96,32 +96,32 @@ async def search_user_infos(
     page_index: int,
     sort_field: str,
     sort_order: int,
-    filters: Optional[List[Dict[str, Any]]] = None 
+    filters: Optional[List[Dict[str, Any]]] = None
 ):
     """
     Advanced version with support for multiple filter operators
-    
+
     Args:
         filters: List of filter dictionaries with format:
                 [{"field": "status", "operator": "eq", "value": "OK"},
                  {"field": "name", "operator": "like", "value": "%test%"}]
-                
+
     Supported operators: eq, ne, like, in, gt, gte, lt, lte
     """
     async with PEM.get_session() as session:
         query = select(UserInfo)
-        
+
         if filters:
             for filter_config in filters:
                 field = filter_config.get("field")
                 operator = filter_config.get("operator", "eq")
                 value = filter_config.get("value")
-                
-                if not hasattr(UserInfo, field) or field in ['metadata_', 'id']:
+
+                if not hasattr(UserInfo, field) or field in ['metadata_']:
                     continue
-                    
+
                 field_attr = getattr(UserInfo, field)
-                
+
                 if operator == "eq":
                     query = query.where(field_attr == value)
                 elif operator == "ne":
@@ -138,12 +138,12 @@ async def search_user_infos(
                     query = query.where(field_attr < value)
                 elif operator == "lte":
                     query = query.where(field_attr <= value)
-        
+
         # Get total count
         count_query = select(func.count()).select_from(query.subquery())
         total_count_result = await session.exec(count_query)
         total_count = total_count_result.one()
-        
+
         if total_count == 0:
             return {
                 "items": [],
@@ -151,28 +151,28 @@ async def search_user_infos(
                 "total_pages": 0,
                 "page_index": page_index,
             }
-        
+
         total_pages = (total_count + limit - 1) // limit if total_count > 0 else 0
-        
+
         if page_index > total_pages and total_pages >= 0:
             raise ValueError(f"page_index ({page_index}) cannot be greater than to total pages ({total_pages})")
-        
+
         # Apply sorting
         if sort_field:
-            if hasattr(UserInfo, sort_field) and sort_field not in ['metadata_', 'id']:
+            if hasattr(UserInfo, sort_field) and sort_field not in ['metadata_']:
                 field_attr = getattr(UserInfo, sort_field)
                 if sort_order == 1:
                     query = query.order_by(asc(field_attr))
                 elif sort_order == -1:
                     query = query.order_by(desc(field_attr))
-        
+
         # Apply pagination
         offset = (page_index - 1) * limit
         query = query.offset(offset).limit(limit)
-        
+
         result = await session.exec(query)
         user_infos = result.all()
-        
+
         return {
             "items": user_infos,
             "total_items": total_count,
