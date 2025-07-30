@@ -89,7 +89,7 @@ async def get_unique_values(
 
         result = await session.exec(stmt)
 
-        return [row[0] for row in result.fetchall()]
+        return result.all()
 
 async def search_user_infos(
     limit: int,
