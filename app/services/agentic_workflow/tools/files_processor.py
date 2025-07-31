@@ -206,6 +206,20 @@ class FileProcessorTool:
 
         async with aiofiles.open(save_file_path, mode='wb') as afp:
             await afp.write(file_stream.getvalue())
+            
+    async def _save_file_streamed(
+        self,
+        file: UploadFile,
+        save_directory: Path
+    ) -> Path:
+        save_directory.mkdir(parents=True, exist_ok=True)
+        save_file_path = save_directory / file.filename
+
+        async with aiofiles.open(save_file_path, mode='wb') as afp:
+            while chunk := await file.read(1024 * 1024):  # 1MB chunk
+                await afp.write(chunk)
+        
+        return save_file_path
 
     async def upload_excel_data(
         self,
@@ -285,64 +299,72 @@ class FileProcessorTool:
         file: UploadFile,
         document_type: DocumentType = DocumentType.CHATBOT,
     ):
-        file_name, file_stream = await parse_file(file)
+        # file_name, file_stream = await parse_file(file)
+        file_name = file.filename
 
         BOT_SAVE_PATH = DEFAULT_SAVE_PATH / self.bot_name / document_type.name
         BOT_SAVE_PATH.mkdir(parents=True, exist_ok=True)
-
-        await self._save_file(
-            file_stream=file_stream,
-            file_name=file_name,
+        
+        saved_file_path = await self._save_file_streamed(
+            file=file,
             save_directory=BOT_SAVE_PATH
         )
+        
+        return saved_file_path
 
-        content = await self.ocr_to_md(
-            file_path=BOT_SAVE_PATH / file_name,
-            agent_name='ocr_pdf_to_md_expert'
-        )
+        # await self._save_file(
+        #     file_stream=file_stream,
+        #     file_name=file_name,
+        #     save_directory=BOT_SAVE_PATH
+        # )
 
-        md_filename = Path(file_name).stem + ".md"
-        md_path = BOT_SAVE_PATH / md_filename
+        # content = await self.ocr_to_md(
+        #     file_path=saved_file_path,#BOT_SAVE_PATH / file_name,
+        #     agent_name='ocr_pdf_to_md_expert'
+        # )
 
-        async with aiofiles.open(md_path, 'w', encoding='utf-8') as md_file:
-            await md_file.write(content)
+        # md_filename = Path(file_name).stem + ".md"
+        # md_path = BOT_SAVE_PATH / md_filename
 
-        root_docs, leaf_docs = await asyncio.to_thread(
-            self.md_reader.load_data,
-            file=md_path,
-            extra_info={"file_name": file_name}
-        )
-        all_docs = root_docs + leaf_docs
+        # async with aiofiles.open(md_path, 'w', encoding='utf-8') as md_file:
+        #     await md_file.write(content)
 
-        tasks = [
-            self.chat(
-                input_=f"""WHOLE_DOCUMENT:\n{content}\n\nCHUNK_CONTENT:\n{doc.get_content()}""",
-                model=get_google_genai_llm(model_name=get_settings_cached().GOOGLEAI_MODEL),
-                agent_prompt_path=get_settings_cached().BASE_PROMPT_PATH,
-                agent_name='contextualizer',
-                func_name='ocr_pdf_to_md'
-            )
-            for doc in all_docs
-        ]
+        # root_docs, leaf_docs = await asyncio.to_thread(
+        #     self.md_reader.load_data,
+        #     file=md_path,
+        #     extra_info={"file_name": file_name}
+        # )
+        # all_docs = root_docs + leaf_docs
 
-        ctxs = await asyncio.gather(*tasks, return_exceptions=True)
+        # tasks = [
+        #     self.chat(
+        #         input_=f"""WHOLE_DOCUMENT:\n{content}\n\nCHUNK_CONTENT:\n{doc.get_content()}""",
+        #         model=get_google_genai_llm(model_name=get_settings_cached().GOOGLEAI_MODEL),
+        #         agent_prompt_path=get_settings_cached().BASE_PROMPT_PATH,
+        #         agent_name='contextualizer',
+        #         func_name='ocr_pdf_to_md'
+        #     )
+        #     for doc in all_docs
+        # ]
 
-        for idx, ctx in enumerate(ctxs):
-            if not isinstance(ctx, Exception):
-                doc: Document = all_docs[idx]
-                doc.extra_info['contextualized_content'] = f"{ctx}\n\n{doc.get_content()}"
-                doc.extra_info['original_content'] = doc.get_content()
+        # ctxs = await asyncio.gather(*tasks, return_exceptions=True)
 
-        leaf_docs = all_docs[len(root_docs):]
+        # for idx, ctx in enumerate(ctxs):
+        #     if not isinstance(ctx, Exception):
+        #         doc: Document = all_docs[idx]
+        #         doc.extra_info['contextualized_content'] = f"{ctx}\n\n{doc.get_content()}"
+        #         doc.extra_info['original_content'] = doc.get_content()
 
-        tasks = [
-            asyncio.create_task(self.store_docs(all_docs)),
-            asyncio.create_task(self.embed_and_index_documents(leaf_docs)),
-        ]
+        # leaf_docs = all_docs[len(root_docs):]
 
-        _ = await asyncio.gather(*tasks)
+        # tasks = [
+        #     asyncio.create_task(self.store_docs(all_docs)),
+        #     asyncio.create_task(self.embed_and_index_documents(leaf_docs)),
+        # ]
 
-        return {"status": 200}
+        # _ = await asyncio.gather(*tasks)
+
+        # return {"status": 200}
 
     async def upload_docx_file(
         self,
