@@ -186,11 +186,16 @@ class MongoDBDocumentStore(BaseDocumentStore):
             if project_name:
                 for key in project_rules_keys:
                     if metadata.get(key):
-                        condition = {
-                            f"attributes.{key}": True,
-                            "attributes.tên dự án": project_name
-                        }
-                        or_conditions.append(condition)
+                        or_conditions.extend([
+                            {
+                                "attributes.tên dự án": project_name,
+                                f"attributes.{key}": True
+                            },
+                            {
+                                "attributes.tên dự án": project_name,
+                                "attributes.file_name": "Hệ thống nhân sự Vận hành.xlsx"
+                            }
+                        ])
 
             # Xử lý các quy tắc gắn với network
             role_networks = [net for net in [role.get("network_in_qlk"), role.get("network_in_ys")] if net]
@@ -209,10 +214,6 @@ class MongoDBDocumentStore(BaseDocumentStore):
             general_condition = {"attributes.quy_định_chung": True}
             if general_condition not in or_conditions:
                 or_conditions.append(general_condition)
-
-        or_conditions.append(
-            {"attributes.file_name": "Hệ thống nhân sự Vận hành.xlsx"}
-        )
 
         if not or_conditions:
             return []
