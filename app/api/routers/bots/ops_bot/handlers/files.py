@@ -18,7 +18,7 @@ from typing import Literal
 from io import BytesIO
 
 from .user_info import (
-    create_user_info,
+    upsert_userinfo,
 )
 
 from api.routers.bots.tools.files import (
@@ -140,7 +140,7 @@ async def ops_upload_excel_user_infos(
             users.append(UserInfo.model_validate(user_data))
 
     if users:
-        await create_user_info(input_=users)
+        await upsert_userinfo(input_=users)
         await create_file_info(
             email=email,
             bot_name=bot_service.bot_name,

@@ -658,65 +658,95 @@ async def get_user_sys_resp_cnt(
 
 # User Info API Endpoints
 @app.post(
-    "/{bot_name}/users",
+    "/{bot_name}/users/upserts",
     dependencies=[Depends(validate_auth)],
     tags=['User Info']
 )
-async def create_users(
+async def upsert_users(
     bot_name: str = Path(...),
     users: List[UserInfo] = Body(..., embed=True)
 ):
     bot_manager: BaseManager = get_bot_manager(bot_name)
     try:
-        response = await bot_manager.create_users(
+        response = await bot_manager.upsert_users(
             users=users
         )
         return response
     except HTTPException:
         raise
     except AttributeError as e:
-        logger.error(f"Attribute error in create_users for bot '{bot_name}': {e}", exc_info=True)
+        logger.error(f"Attribute error in upsert_users for bot '{bot_name}': {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail=f"Bot '{bot_name}' does not support create_users feature"
+            detail=f"Bot '{bot_name}' does not support upsert_users feature"
         )
     except Exception as e:
-        logger.error(f"An unhandled error occurred in create_users for bot '{bot_name}': {e}", exc_info=True)
+        logger.error(f"An unhandled error occurred in upsert_users for bot '{bot_name}': {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
         )
 
-@app.put(
-    "/{bot_name}/users",
-    dependencies=[Depends(validate_auth)],
-    tags=['User Info']
-)
-async def update_users(
-    bot_name: str = Path(...),
-    users: List[UserInfo] = Body(..., embed=True)
-):
-    bot_manager: BaseManager = get_bot_manager(bot_name)
-    try:
-        response = await bot_manager.update_users(
-            users=users
-        )
-        return response
-    except HTTPException:
-        raise
-    except AttributeError as e:
-        logger.error(f"Attribute error in update_users for bot '{bot_name}': {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail=f"Bot '{bot_name}' does not support update_users feature"
-        )
-    except Exception as e:
-        logger.error(f"An unhandled error occurred in update_users for bot '{bot_name}': {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
-        )
-        
+# @app.post(
+#     "/{bot_name}/users",
+#     dependencies=[Depends(validate_auth)],
+#     tags=['User Info']
+# )
+# async def create_users(
+#     bot_name: str = Path(...),
+#     users: List[UserInfo] = Body(..., embed=True)
+# ):
+#     bot_manager: BaseManager = get_bot_manager(bot_name)
+#     try:
+#         response = await bot_manager.create_users(
+#             users=users
+#         )
+#         return response
+#     except HTTPException:
+#         raise
+#     except AttributeError as e:
+#         logger.error(f"Attribute error in create_users for bot '{bot_name}': {e}", exc_info=True)
+#         raise HTTPException(
+#             status_code=status.HTTP_501_NOT_IMPLEMENTED,
+#             detail=f"Bot '{bot_name}' does not support create_users feature"
+#         )
+#     except Exception as e:
+#         logger.error(f"An unhandled error occurred in create_users for bot '{bot_name}': {e}", exc_info=True)
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail="Internal server error"
+#         )
+
+# @app.put(
+#     "/{bot_name}/users",
+#     dependencies=[Depends(validate_auth)],
+#     tags=['User Info']
+# )
+# async def update_users(
+#     bot_name: str = Path(...),
+#     users: List[UserInfo] = Body(..., embed=True)
+# ):
+#     bot_manager: BaseManager = get_bot_manager(bot_name)
+#     try:
+#         response = await bot_manager.update_users(
+#             users=users
+#         )
+#         return response
+#     except HTTPException:
+#         raise
+#     except AttributeError as e:
+#         logger.error(f"Attribute error in update_users for bot '{bot_name}': {e}", exc_info=True)
+#         raise HTTPException(
+#             status_code=status.HTTP_501_NOT_IMPLEMENTED,
+#             detail=f"Bot '{bot_name}' does not support update_users feature"
+#         )
+#     except Exception as e:
+#         logger.error(f"An unhandled error occurred in update_users for bot '{bot_name}': {e}", exc_info=True)
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail="Internal server error"
+#         )
+
 @app.delete(
     "/{bot_name}/users",
     dependencies=[Depends(validate_auth)],
@@ -755,7 +785,7 @@ async def delete_users(
 async def get_distinct_user_values(
     bot_name: str = Path(...),
     column_name: str = Path(...),
-    filters: Optional[List[Dict[str, Any]]] = Body(None, 
+    filters: Optional[List[Dict[str, Any]]] = Body(None,
     description="Dictionary of multiple field-value pairs to filter by (optional). Supported operators: eq, ne, like, in, gt, gte, lt, lte",
     embed=True)
 ):
@@ -792,7 +822,7 @@ async def search_users(
     page_index: int = Body(1),
     sort_field: str = Body(None),
     sort_order: Literal[1, -1] = Body(-1, description="Sort order (Asc = 1, Desc = -1)"),
-    filters: Optional[List[Dict[str, Any]]] = Body(None, 
+    filters: Optional[List[Dict[str, Any]]] = Body(None,
     description="Dictionary of multiple field-value pairs to filter by (optional). Supported operators: eq, ne, like, in, gt, gte, lt, lte")
 ):
     bot_manager: BaseManager = get_bot_manager(bot_name)

@@ -28,6 +28,7 @@ from .handlers.files import (
 )
 
 from .handlers.user_info import (
+    upsert_userinfo,
     create_user_info,
     update_user_info,
     delete_user_info,
@@ -339,6 +340,17 @@ class OpsBotManager(BaseManager):
         return sum([len(chat) for chat in his_sessions])
 
     # User Info
+    async def upsert_users(
+        self,
+        users
+    ):
+        data = await upsert_userinfo(input_=users)
+
+        return {
+            "status": 200,
+            "data": data
+        }
+
     async def create_users(
         self,
         users
@@ -360,7 +372,7 @@ class OpsBotManager(BaseManager):
             "status": 200,
             "data": data
         }
-        
+
     async def delete_users(
         self,
         ids
@@ -371,11 +383,11 @@ class OpsBotManager(BaseManager):
             "status": 200,
             "data": data
         }
-        
+
     async def get_distinct_user_values(
         self,
         column_name: str,
-        filters: Optional[List[Dict[str, Any]]] = None 
+        filters: Optional[List[Dict[str, Any]]] = None
     ):
         data = await get_unique_values(
             column_name=column_name,
@@ -386,14 +398,14 @@ class OpsBotManager(BaseManager):
             "status": 200,
             "data": data
         }
-    
+
     async def search_users(
         self,
         limit: int,
         page_index: int,
         sort_field: str,
         sort_order: int,
-        filters: Optional[List[Dict[str, Any]]] = None 
+        filters: Optional[List[Dict[str, Any]]] = None
     ):
         data = await search_user_infos(
             limit=limit,

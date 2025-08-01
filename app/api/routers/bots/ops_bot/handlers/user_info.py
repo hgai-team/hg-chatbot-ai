@@ -1,17 +1,57 @@
+from typing import Optional, Any, List, Dict
 from uuid import uuid4, UUID
+
 from sqlmodel import (
     func,
     select, update, delete, asc, desc
 )
+
+from sqlalchemy.dialects.postgresql import insert
 
 from api.schema import (
     UserInfo,
 )
 from core.storages.client import PostgresEngineManager as PEM
 
-from typing import Optional, Any, List, Dict
-
 # User Info
+async def upsert_userinfo(
+    input_: List[UserInfo],
+):
+    if not input_:
+        return
+
+    async with PEM.get_session() as session:
+        values_to_upsert = []
+        for user_info in input_:
+            values_to_upsert.append({
+                'id': user_info.id or uuid4(),
+                'name': str(user_info.name).lower() if user_info.name else user_info.name,
+                'email': str(user_info.email).lower() if user_info.email else user_info.email,
+                'managed_by': str(user_info.managed_by).lower() if user_info.managed_by else user_info.managed_by,
+                'network_in_qlk': str(user_info.network_in_qlk).lower() if user_info.network_in_qlk else user_info.network_in_qlk,
+                'network_in_ys': str(user_info.network_in_ys).lower() if user_info.network_in_ys else user_info.network_in_ys,
+                'project': str(user_info.project).lower() if user_info.project else user_info.project,
+                'department': str(user_info.department).lower() if user_info.department else user_info.department,
+                'metadata': user_info.metadata_,
+            })
+
+        stmt = insert(UserInfo.__table__).values(values_to_upsert)
+
+        update_dict = {
+            'name': stmt.excluded.name,
+            'managed_by': stmt.excluded.managed_by,
+            'network_in_qlk': stmt.excluded.network_in_qlk,
+            'network_in_ys': stmt.excluded.network_in_ys,
+            'project': stmt.excluded.project,
+            'department': stmt.excluded.department,
+            'metadata': stmt.excluded.metadata,
+        }
+        stmt = stmt.on_conflict_do_update(
+            index_elements=['id'],
+            set_=update_dict
+        )
+
+        await session.exec(stmt)
 
 async def create_user_info(
     input_: List[UserInfo],
