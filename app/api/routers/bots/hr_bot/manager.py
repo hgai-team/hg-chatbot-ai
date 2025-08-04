@@ -1,4 +1,5 @@
 import io
+import asyncio
 import pandas as pd
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -155,8 +156,23 @@ class HrBotManager(BaseManager):
     async def count_tokens(
         self,
         session_id: str,
-        message: str
+        message: str,
+        video_url: str = None,
+        start_offset: str = None,
+        end_offset: str = None,
+        fps: int = 1,
     ):
+        from core.mcp.vid_ytb import count_video_tokens
+        
+        total_video_tokens = 0
+        if video_url:
+            total_video_tokens = await count_video_tokens(
+                video_url,
+                start_offset,
+                end_offset,
+                fps,
+            ) 
+        
         session_his = await self.hr_bot.memory_store.get_session_history(
             session_id=session_id
         )
@@ -176,14 +192,24 @@ class HrBotManager(BaseManager):
 
         if not contents:
             return {
-                "totalTokens": 0,
-                "cachedContentTokenCount": None
+                "total_tokens": total_video_tokens,
+                "cached_content_token_count": None,
+                "max_tokens": 512000
             }
-
-        return self.client.models.count_tokens(
-            model=get_settings_cached().GOOGLEAI_MODEL_THINKING,
-            contents=contents
-        )
+            
+        try:
+            resp = await asyncio.to_thread(
+                self.client.models.count_tokens,
+                model=get_settings_cached().GOOGLEAI_MODEL_THINKING,
+                contents=contents
+            )
+        except Exception as e:
+            raise
+        
+        resp_dict = resp.model_dump()
+        resp_dict["total_tokens"] = resp_dict.get("total_tokens", 0) + total_video_tokens
+        resp_dict["max_tokens"] = 512000
+        return resp_dict
 
     # Logs
     async def get_logs(

@@ -467,6 +467,10 @@ async def add_rating(
 async def count_tokens(
     session_id: str = Body(..., embed=True),
     message: str = Body(..., embed=True),
+    video_url: str = Body(None, embed=True),
+    start_offset: str = Body(None, embed=True),
+    end_offset: str = Body(None, embed=True),
+    fps: int = Body(1, embed=True),
     bot_name: str = Path(...),
 ):
     bot_manager: BaseManager = get_bot_manager(bot_name)
@@ -474,7 +478,11 @@ async def count_tokens(
     try:
         response = await bot_manager.count_tokens(
             session_id=session_id,
-            message=message
+            message=message,
+            video_url=video_url,
+            start_offset=start_offset,
+            end_offset=end_offset,
+            fps=fps,
         )
         return BaseResponse(
             status=200,
@@ -493,47 +501,47 @@ async def count_tokens(
             detail="Internal server error"
         )
 
-@app.post(
-    "/{bot_name}/sessions/count-video-tokens",
-    dependencies=[Depends(validate_auth)],
-    response_model=BaseResponse,
-    tags=['Sessions']
-)
-async def count_video_tokens(
-    video_url: str = Body(..., embed=True),
-    start_offset: str = Body(None, embed=True),
-    end_offset: str = Body(None, embed=True),
-    fps: int = Body(1, embed=True),
-    bot_name: str = Path(...),
-):
-    try:
-        from core.mcp.vid_ytb import count_video_tokens
+# @app.post(
+#     "/{bot_name}/sessions/count-video-tokens",
+#     dependencies=[Depends(validate_auth)],
+#     response_model=BaseResponse,
+#     tags=['Sessions']
+# )
+# async def count_video_tokens(
+#     video_url: str = Body(..., embed=True),
+#     start_offset: str = Body(None, embed=True),
+#     end_offset: str = Body(None, embed=True),
+#     fps: int = Body(1, embed=True),
+#     bot_name: str = Path(...),
+# ):
+#     try:
+#         from core.mcp.vid_ytb import count_video_tokens
 
-        total_tokens = await count_video_tokens(
-            video_url,
-            start_offset,
-            end_offset,
-            fps,
-        )
+#         total_tokens = await count_video_tokens(
+#             video_url,
+#             start_offset,
+#             end_offset,
+#             fps,
+#         )
 
-        return BaseResponse(
-            status=200,
-            data={
-                "totalTokens": total_tokens
-            }
-        )
-    except AttributeError as e:
-        logger.error(f"Attribute error in count_video_tokens for bot '{bot_name}': {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail=f"Bot '{bot_name}' does not support count_video_tokens feature"
-        )
-    except Exception as e:
-        logger.error(f"An error occurred in count_video_tokens for bot '{bot_name}': {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
-        )
+#         return BaseResponse(
+#             status=200,
+#             data={
+#                 "totalTokens": total_tokens
+#             }
+#         )
+#     except AttributeError as e:
+#         logger.error(f"Attribute error in count_video_tokens for bot '{bot_name}': {e}", exc_info=True)
+#         raise HTTPException(
+#             status_code=status.HTTP_501_NOT_IMPLEMENTED,
+#             detail=f"Bot '{bot_name}' does not support count_video_tokens feature"
+#         )
+#     except Exception as e:
+#         logger.error(f"An error occurred in count_video_tokens for bot '{bot_name}': {e}", exc_info=True)
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail="Internal server error"
+#         )
 
 # Log API Endpoints
 @app.post(
