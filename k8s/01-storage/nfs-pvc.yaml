@@ -1,0 +1,29 @@
+# PersistentVolumeClaim cho uploaded files
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: uploaded-files-pvc
+  namespace: hg-chatbot
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-storage
+  resources:
+    requests:
+      storage: 100Gi
+  volumeName: nfs-uploaded-files-pv
+
+# PVC cho model weights
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: model-weights-pvc
+  namespace: hg-chatbot
+spec:
+  accessModes:
+    - ReadOnlyMany
+  storageClassName: nfs-storage
+  resources:
+    requests:
+      storage: 50Gi
+  volumeName: nfs-model-weights-pv

@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crawl-comment
+  namespace: hg-chatbot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: crawl-comment
+  template:
+    metadata:
+      labels:
+        app: crawl-comment
+    spec:
+      containers:
+      - name: crawl-comment
+        image: krntl/crawl-comment:latest
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: crawl-comment-service
+  namespace: hg-chatbot
+spec:
+  selector:
+    app: crawl-comment
+  ports:
+  - port: 80
+    targetPort: 5000

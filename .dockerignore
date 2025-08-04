@@ -1,0 +1,81 @@
+# .dockerignore
+
+# Environment files - QUAN TRỌNG
+.env
+.env.*
+*.env
+
+# Model weights - QUAN TRỌNG: không đưa vào image
+model_weights/
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.onnx
+*.h5
+*.pb
+*.ckpt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+hg_chatbot.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+venv/
+env/
+
+# Docker files không cần
+docker-compose*.yaml
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# K8s configs
+k8s/
+
+# Scripts
+scripts/
+
+# IDE và tools
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Logs và temp files
+*.log
+logs/
+*.tmp
+*.temp
+
+# Test files
+tests/
+test_*.py
+*_test.py
+
+# Documentation
+*.md
+docs/
+
+# Data files không cần trong image
+data/
+uploaded_files/
+*.csv
+*.xlsx
+*.pdf
+*.txt
+*.json
+!requirements.txt
+!pyproject.toml

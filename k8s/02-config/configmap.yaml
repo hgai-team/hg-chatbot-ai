@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hg-chatbot-config
+  namespace: hg-chatbot
+data:
+  # App configurations
+  APP_NAME: "HG Chatbot"
+  APP_ENV: "production"
+  APP_PORT: "8888"
+  
+  # Model configurations
+  MODEL_NAME: "vinai/phobert-base"
+  MODEL_CACHE_DIR: "/app/model_cache"
+  
+  # Upload configurations
+  UPLOAD_DIR: "/app/uploaded_files"
+  MAX_UPLOAD_SIZE: "104857600"  # 100MB
+  ALLOWED_EXTENSIONS: "pdf,txt,docx,csv"
+  
+  # Database endpoints (internal K8s DNS)
+  MONGODB_HOST: "mongodb-hg-chatbot"
+  MONGODB_PORT: "27017"
+  MONGODB_DB: "hg_chatbot"
+  
+  POSTGRES_HOST: "postgres-hg-chatbot"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "hg_chatbot"
+  
+  QDRANT_HOST: "qdrant-hg-chatbot"
+  QDRANT_PORT: "6333"
+  QDRANT_COLLECTION: "documents"
+  
+  # Logging
+  LOG_LEVEL: "INFO"
+  LOG_DIR: "/app/logs"

@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: nfs-uploaded-files-pv
+spec:
+  capacity:
+    storage: 100Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs-storage
+  nfs:
+    server: 192.168.1.74
+    path: /srv/k8s-shared/uploaded-files
+    readOnly: falses
+
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: nfs-model-weights-pv
+spec:
+  capacity:
+    storage: 50Gi
+  accessModes:
+    - ReadOnlyMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs-storage
+  nfs:
+    server: 192.168.1.74
+    path: /srv/k8s-shared/model-weights
+    readOnly: true

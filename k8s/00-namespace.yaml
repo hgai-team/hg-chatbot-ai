@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hg-chatbot
+  labels:
+    name: hg-chatbot
+    environment: production

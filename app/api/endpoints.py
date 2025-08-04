@@ -23,8 +23,7 @@ app = APIRouter(
 )
 
 @app.get(
-    "/",
-    dependencies=[Depends(validate_auth)],
+    "/health"
 )
 def health_check():
     return {"status": 200}
