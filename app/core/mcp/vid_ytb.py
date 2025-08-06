@@ -132,6 +132,8 @@ async def video_analyze(
                     )
 
                 yield {'_type': 'response', 'text': response.text}
+            else:
+                raise
 
         else:
             yield {'_type': 'response', 'text': response.message.content}
