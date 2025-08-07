@@ -20,11 +20,7 @@ from fastapi import (
 from api.security.api_credentials import validate_auth
 from api.routers.bots.tools.traces import (
     get_all_traces,
-    get_all_traces_by_date_range,
-    get_model_usage_statistics,
-    get_model_usage_statistics_by_date_range,
-    get_model_usage_for_user,
-    get_model_usage_for_user_by_date_range
+    get_model_usage_statistics
 )
 
 app = APIRouter(
@@ -41,9 +37,43 @@ async def fetch_all_traces(
     page_index: int = Body(1),
     sort_field: str = Body(None),
     sort_order: Literal[-1, 1] = Body(-1, description="Sort order (Asc = 1, Desc = -1)"),
+    start_date: Optional[datetime] = Body(None, description="Start date for filtering (optional)"),
+    end_date: Optional[datetime] = Body(None, description="End date for filtering (optional)"),
     filters: Optional[List[Dict[str, Any]]] = Body(None, description="Dictionary of multiple field-value pairs to filter by (optional). Supported operators: eq, ne, like, in, gt, gte, lt, lte")
 ):
+    """
+    Fetch all traces with optional date range and custom filters.
+
+    If start_date and end_date are provided, traces will be filtered to that date range.
+    Additional filters can be applied through the filters parameter.
+    """
     try:
+        # Add date range filters if provided
+        if start_date and end_date:
+            date_filters = [
+                {
+                    "field": "start_time",
+                    "operator": "gte",
+                    "value": start_date
+                },
+                {
+                    "field": "start_time",
+                    "operator": "lte",
+                    "value": end_date
+                }
+            ]
+
+            if filters:
+                filters.extend(date_filters)
+            else:
+                filters = date_filters
+        elif start_date or end_date:
+            # If only one date is provided, return error
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Both start_date and end_date must be provided together"
+            )
+
         resp = await get_all_traces(
             limit=limit,
             page_index=page_index,
@@ -63,56 +93,52 @@ async def fetch_all_traces(
         )
 
 @app.post(
-    "/traces/date-range",
-    dependencies=[Depends(validate_auth)],
-    tags=['Traces']
-)
-async def fetch_all_traces_by_date_range(
-    start_date: datetime = Body(...),
-    end_date: datetime = Body(...),
-    limit: int = Body(10, ge=1, le=1000),
-    page_index: int = Body(1),
-    sort_field: str = Body(None),
-    sort_order: Literal[-1, 1] = Body(-1, description="Sort order (Asc = 1, Desc = -1)"),
-    filters: Optional[List[Dict[str, Any]]] = Body(None, description="Dictionary of multiple field-value pairs to filter by (optional). Supported operators: eq, ne, like, in, gt, gte, lt, lte")
-):
-    try:
-        resp = await get_all_traces_by_date_range(
-            start_date=start_date,
-            end_date=end_date,
-            limit=limit,
-            page_index=page_index,
-            sort_field=sort_field,
-            sort_order=sort_order,
-            filters=filters
-        )
-        return resp
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"An unhandled error occurred in fetch_all_traces_by_date_range: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
-        )
-
-@app.post(
     "/traces/statistics",
     dependencies=[Depends(validate_auth)],
     tags=['Traces']
 )
 async def fetch_traces_statistics(
+    start_date: Optional[datetime] = Body(None, description="Start date for filtering (optional)"),
+    end_date: Optional[datetime] = Body(None, description="End date for filtering (optional)"),
     filters: Optional[List[Dict[str, Any]]] = Body(
         None,
-        description="Dictionary of multiple field-value pairs to filter by (optional). Supported operators: eq, ne, like, in, gt, gte, lt, lte",
-        embed=True
+        description="Dictionary of multiple field-value pairs to filter by (optional). Supported operators: eq, ne, like, in, gt, gte, lt, lte"
     )
 ):
+    """
+    Fetch model usage statistics with optional date range and custom filters.
+
+    If start_date and end_date are provided, statistics will be filtered to that date range.
+    Additional filters can be applied through the filters parameter.
+    """
     try:
-        resp = await get_model_usage_statistics(
-            filters=filters
-        )
+        # If date range is provided, add to filters
+        if start_date and end_date:
+            date_filters = [
+                {
+                    "field": "start_time",
+                    "operator": "gte",
+                    "value": start_date
+                },
+                {
+                    "field": "start_time",
+                    "operator": "lte",
+                    "value": end_date
+                }
+            ]
+
+            if filters:
+                filters.extend(date_filters)
+            else:
+                filters = date_filters
+        elif start_date or end_date:
+            # If only one date is provided, return error
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Both start_date and end_date must be provided together"
+            )
+
+        resp = await get_model_usage_statistics(filters=filters)
         return resp
 
     except HTTPException:
@@ -125,87 +151,61 @@ async def fetch_traces_statistics(
         )
 
 @app.post(
-    "/traces/statistics/date-range",
-    dependencies=[Depends(validate_auth)],
-    tags=['Traces']
-)
-async def fetch_traces_statistics_by_date_range(
-    start_date: datetime = Body(...),
-    end_date: datetime = Body(...),
-    filters: Optional[List[Dict[str, Any]]] = Body(
-        None,
-        description="Dictionary of multiple field-value pairs to filter by (optional). Supported operators: eq, ne, like, in, gt, gte, lt, lte",
-        embed=True
-    )
-):
-    try:
-        resp = await get_model_usage_statistics_by_date_range(
-            start_date=start_date,
-            end_date=end_date,
-            filters=filters
-        )
-        return resp
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"An unhandled error occurred in fetch_traces_statistics_by_date_range: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
-        )
-
-@app.post(
     "/traces/statistics/user",
     dependencies=[Depends(validate_auth)],
     tags=['Traces']
 )
 async def fetch_traces_statistics_for_user(
-    user_id: UUID = Body(...),
+    user_id: UUID = Body(..., description="User ID to filter statistics"),
+    start_date: Optional[datetime] = Body(None, description="Start date for filtering (optional)"),
+    end_date: Optional[datetime] = Body(None, description="End date for filtering (optional)"),
     filters: Optional[List[Dict[str, Any]]] = Body(
         None,
-        description="Dictionary of multiple field-value pairs to filter by (optional). Supported operators: eq, ne, like, in, gt, gte, lt, lte",
-        embed=True
+        description="Dictionary of multiple field-value pairs to filter by (optional). Supported operators: eq, ne, like, in, gt, gte, lt, lte"
     )
 ):
-    try:
-        resp = await get_model_usage_for_user(
-            user_id=user_id,
-            filters=filters
-        )
-        return resp
+    """
+    Fetch model usage statistics for a specific user with optional date range and custom filters.
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"An unhandled error occurred in fetch_traces_statistics_for_user: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
-        )
-
-@app.post(
-    "/traces/statistics/user/date-range",
-    dependencies=[Depends(validate_auth)],
-    tags=['Traces']
-)
-async def fetch_traces_statistics_for_user_by_date_range(
-    start_date: datetime = Body(...),
-    end_date: datetime = Body(...),
-    user_id: UUID = Body(...),
-    filters: Optional[List[Dict[str, Any]]] = Body(
-        None,
-        description="Dictionary of multiple field-value pairs to filter by (optional). Supported operators: eq, ne, like, in, gt, gte, lt, lte",
-        embed=True
-    )
-):
+    If start_date and end_date are provided, statistics will be filtered to that date range.
+    Additional filters can be applied through the filters parameter.
+    """
     try:
-        resp = await get_model_usage_for_user_by_date_range(
-            start_date=start_date,
-            end_date=end_date,
-            user_id=user_id,
-            filters=filters
-        )
+        # Build filters list
+        _filters = [
+            {
+                "field": "metadata_",
+                "operator": "contains",
+                "value": {"user_id": str(user_id)}
+            }
+        ]
+
+        # Add date range filters if provided
+        if start_date and end_date:
+            _filters.extend([
+                {
+                    "field": "start_time",
+                    "operator": "gte",
+                    "value": start_date
+                },
+                {
+                    "field": "start_time",
+                    "operator": "lte",
+                    "value": end_date
+                }
+            ])
+        elif start_date or end_date:
+            # If only one date is provided, return error
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Both start_date and end_date must be provided together"
+            )
+
+        # Add any additional filters
+        if filters:
+            _filters.extend(filters)
+
+        resp = await get_model_usage_statistics(filters=_filters)
         return resp
 
     except HTTPException:
