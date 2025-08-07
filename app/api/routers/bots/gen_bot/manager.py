@@ -94,8 +94,9 @@ class GenBotManager(BaseManager):
         end_offset: str = None,
         fps: int = 1,
     ):
+        from api.routers.bots.tools.tokens import count_text_tokens
         from core.mcp.vid_ytb import count_video_tokens
-        
+
         total_video_tokens = 0
         if video_url:
             total_video_tokens = await count_video_tokens(
@@ -103,43 +104,36 @@ class GenBotManager(BaseManager):
                 start_offset,
                 end_offset,
                 fps,
-            ) 
-        
+            )
+
         session_his = await self.gen_bot.memory_store.get_session_history(
             session_id=session_id
         )
 
-        extra_content = []
+        messages = ""
         if message:
-            extra_content = [types.Content(role="user", parts=[types.Part(text=message)])]
+            messages += f"{message}\n\n"
 
-        contents = [
-            types.Content(role=role, parts=[types.Part(text=text if text else "")])
-            for record in session_his.history
-            for role, text in (("user", record["message"]), ("model", record["response"]))
-        ]
+        for record in session_his.history:
+            for text in [record["message"], record["response"]]:
+                messages += f"{text}\n\n"
 
-        if extra_content:
-            contents = contents + extra_content
-
-        if not contents:
+        if not messages:
             return {
                 "total_tokens": total_video_tokens,
+                "total_video_tokens": total_video_tokens,
                 "cached_content_token_count": None,
                 "max_tokens": 512000
             }
-            
+
         try:
-            resp = await asyncio.to_thread(
-                self.client.models.count_tokens,
-                model=get_settings_cached().GOOGLEAI_MODEL_THINKING,
-                contents=contents
-            )
+            resp = await count_text_tokens(text=messages)
         except Exception as e:
-            raise
-        
-        resp_dict = resp.model_dump()
-        resp_dict["total_tokens"] = resp_dict.get("total_tokens", 0) + total_video_tokens
+            raise e
+
+        resp_dict = {}
+        resp_dict["total_tokens"] = resp.get("token_count", 0) + total_video_tokens
+        resp_dict["total_video_tokens"] = total_video_tokens
         resp_dict["max_tokens"] = 512000
         return resp_dict
 

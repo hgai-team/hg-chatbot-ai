@@ -183,6 +183,7 @@ class GenBotService(BaseBotService):
 
             if selected_tool and selected_tool in TOOL_FUNCTIONS:
                 response = ""
+                has_error = False
                 async for data in TOOL_FUNCTIONS[selected_tool](
                     query_text=query_text,
                     user_id=user_id,
@@ -191,16 +192,18 @@ class GenBotService(BaseBotService):
                 ):
                     if data['_type'] == 'response':
                         response += data['text']
+                    elif data['_type'] == 'error':
+                        has_error = True
                     yield data
 
                 await self._update_chat(
                     chat_id=chat_id,
                     response=response,
                     start_time=start_time_chat,
-                    status=ChatStatus.FINISHED.value
+                    status=ChatStatus.FINISHED.value if not has_error else ChatStatus.ERROR.value
                 )
                 return
-            
+
             messages = initial_messages + [ChatMessage(role=MessageRole.USER, content=query_text)]
             response: ChatCompletion = await self._get_response(
                 inal_messages=messages,

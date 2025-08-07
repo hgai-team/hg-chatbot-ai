@@ -97,7 +97,8 @@ async def _analyze(
     try:
         comments = await crawl_comment(video_url)
     except HTTPException:
-        raise
+        yield {'_type': 'error'}
+        return
 
     model = get_google_genai_llm(model_name='gemini-2.0-flash')
 
@@ -148,10 +149,8 @@ async def _analyze(
 
         if not batch_response:
             logger.error(f"Sau khi chạy tất cả batch, `batch_response` rỗng! all_batches: {all_batches}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail='Lỗi khi xử lý phân tích comment'
-            )
+            yield {'_type': 'error'}
+            return
 
         if len(batch_response) > 1:
             messages = await _create_messages(
@@ -166,10 +165,8 @@ async def _analyze(
 
     except Exception as e:
         logger.error(f"Lỗi khi xử lý phân tích comment: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail='Lỗi khi xử lý phân tích comment'
-        )
+        yield {'_type': 'error'}
+        return
 
 async def crawl_comment(
     video_url: str,
@@ -179,7 +176,7 @@ async def crawl_comment(
     params = {"video_id": video_id, "max_results": 1000}
 
     try:
-        resp = requests.get(downstream, params=params, timeout=3600)
+        resp = requests.get(downstream, params=params, timeout=30)
         resp.raise_for_status()
     except Timeout:
         raise HTTPException(
@@ -236,12 +233,18 @@ async def comment_analyze(
             "session_id": session_id,
         }
     ) as (_, _, wrapper):
-        response: ChatCompletion = await wrapper(xai_llm.arun, messages=messages)
+        try:
+            response: ChatCompletion = await wrapper(xai_llm.arun, messages=messages)
+        except Exception as e:
+            yield {
+                '_type': 'error'
+            }
+            return
 
     json_resp = json_parser(response.choices[0].message.content)
     if "status" in json_resp:
         if json_resp['status'] == 'READY_FOR_ANALYSIS':
-            yield {'_type': 'response', 'text': f"{json_resp['response']}\n"}
+            yield {'_type': 'response', 'text': f"{json_resp['response']}\n\n"}
 
             async for data in _analyze(
                 user_id=user_id,

@@ -21,6 +21,7 @@ asyncpg==0.30.0
 psycopg2-binary==2.9.10
 sentence-transformers==4.1.0
 tenacity==8.5.0
+tiktoken
 
 fastapi==0.115.14
 uvicorn==0.35.0

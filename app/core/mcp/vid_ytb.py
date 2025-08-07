@@ -97,7 +97,13 @@ async def video_analyze(
             "agent_name": "VidMind",
         }
     ) as (_, _, wrapper):
-        response: ChatResponse = await wrapper(google_llm.arun, messages=messages)
+        try:
+            response: ChatResponse = await wrapper(google_llm.arun, messages=messages)
+        except Exception as e:
+            yield {
+                '_type': 'error'
+            }
+            return
 
     json_resp = json_parser(response.message.content)
     if "status" in json_resp:
@@ -110,30 +116,38 @@ async def video_analyze(
             )
 
             if total_tokens > 0 and total_tokens < 512000:
-                yield {'_type': 'response', 'text': f"{json_resp['response']}\n"}
+                yield {'_type': 'response', 'text': f"{json_resp['response']}\n\n"}
 
-                async with TM.trace_span(
-                    span_name="video_analyzer",
-                    span_type="HGGPT",
-                    custom_metadata={
-                        "user_id": user_id,
-                        "session_id": session_id,
-                        "agent_name": "video_analyzer",
+                try:
+                    async with TM.trace_span(
+                        span_name="video_analyzer",
+                        span_type="HGGPT",
+                        custom_metadata={
+                            "user_id": user_id,
+                            "session_id": session_id,
+                            "agent_name": "video_analyzer",
+                        }
+                    ) as (_, _, wrapper):
+                        response = await wrapper(
+                            _analyze,
+                            video_analyzer=video_analyzer,
+                            video_url=json_resp['video_url'],
+                            user_request=json_resp['user_request'],
+                            start_offset=json_resp['analysis_params']['start_offset'],
+                            end_offset=json_resp['analysis_params']['end_offset'],
+                            fps=json_resp['analysis_params']['fps']
+                        )
+
+                    yield {'_type': 'response', 'text': response.text}
+
+                except Exception as e:
+                    yield {
+                        '_type': 'error'
                     }
-                ) as (_, _, wrapper):
-                    response = await wrapper(
-                        _analyze,
-                        video_analyzer=video_analyzer,
-                        video_url=json_resp['video_url'],
-                        user_request=json_resp['user_request'],
-                        start_offset=json_resp['analysis_params']['start_offset'],
-                        end_offset=json_resp['analysis_params']['end_offset'],
-                        fps=json_resp['analysis_params']['fps']
-                    )
-
-                yield {'_type': 'response', 'text': response.text}
             else:
-                raise
+                yield {
+                    '_type': 'error'
+                }
 
         else:
             yield {'_type': 'response', 'text': response.message.content}
