@@ -19,29 +19,39 @@ from services import get_settings_cached, get_google_genai_llm, GoogleGenAILLM, 
 
 
 def _extract_video_id(url: str):
-    if "youtube.com/watch?v=" in url:
-        return url.split("v=")[1].split("&")[0]
-    elif "youtu.be/" in url:
-        return url.split("youtu.be/")[1].split("?")[0]
-    else:
-        return url
+    try:
+        if "youtube.com/watch?v=" in url:
+            return url.split("v=")[1].split("&")[0]
+        elif "youtu.be/" in url:
+            return url.split("youtu.be/")[1].split("?")[0]
+        else:
+            return url
+    except Exception as e:
+        logger.error(f"Error extracting video ID: {e}")
+        raise ValueError(f"Invalid video URL: {url}")
 
 async def _create_messages(
     agent: dict,
     input_: Any
 ):
-    messages = [
-        ChatMessage(
-            role=MessageRole.SYSTEM,
-            content=(
-                f"{agent['role']}: {agent['description']}\n\n"
-                f"## Hướng dẫn:\n{agent['instructions']}\n\n"
-            )
-        ),
-        ChatMessage(role=MessageRole.USER, content=f"## Đầu vào:\n{input_}\n\n## Phản hồi:\n"),
-    ]
-
-    return messages
+    try:
+        messages = [
+            ChatMessage(
+                role=MessageRole.SYSTEM,
+                content=(
+                    f"{agent['role']}: {agent['description']}\n\n"
+                    f"## Hướng dẫn:\n{agent['instructions']}\n\n"
+                )
+            ),
+            ChatMessage(role=MessageRole.USER, content=f"## Đầu vào:\n{input_}\n\n## Phản hồi:\n"),
+        ]
+        return messages
+    except KeyError as e:
+        logger.error(f"Missing required agent field: {e}")
+        raise ValueError(f"Invalid agent configuration: missing {e}")
+    except Exception as e:
+        logger.error(f"Error creating messages: {e}")
+        raise
 
 async def _chat(
     user_id: str,
@@ -78,11 +88,14 @@ async def _process_batch(
     agent: dict,
     agent_name: str
 ):
-
-    logger.info(f"[Batch {batch_idx}] Đang được xử lý")
-    messages = await _create_messages(agent=agent, input_=batch_json)
-    response  = await _chat(user_id=user_id, session_id=session_id, model=model, messages=messages, agent_name=agent_name)
-    return response
+    try:
+        logger.info(f"[Batch {batch_idx}] Đang được xử lý")
+        messages = await _create_messages(agent=agent, input_=batch_json)
+        response = await _chat(user_id=user_id, session_id=session_id, model=model, messages=messages, agent_name=agent_name)
+        return response
+    except Exception as e:
+        logger.error(f"Error processing batch {batch_idx}: {e}")
+        raise
 
 async def _analyze(
     user_id: str,
@@ -97,12 +110,22 @@ async def _analyze(
     try:
         comments = await crawl_comment(video_url)
     except HTTPException:
-        yield {'_type': 'error'}
+        yield {'_type': 'error', 'text': 'Internal server error'}
+        return
+    except Exception as e:
+        logger.error(f"Unexpected error crawling comments: {e}")
+        yield {'_type': 'error', 'text': 'Internal server error'}
         return
 
-    model = get_google_genai_llm(model_name='gemini-2.0-flash')
+    try:
+        model = get_google_genai_llm(model_name='gemini-2.0-flash')
+    except Exception as e:
+        logger.error(f"Error initializing Google GenAI model: {e}")
+        yield {'_type': 'error', 'text': 'Internal server error'}
+        return
 
     yield {'_type': 'header_thinking', 'text': "Đang phân tích"}
+
     try:
         text_comments = []
         id_comments = []
@@ -119,11 +142,10 @@ async def _analyze(
                 'user_request': user_request
             }
             batch_text = text_comments[idx:idx + batch_size]
-            batch_id   = id_comments[idx:idx + batch_size]
+            batch_id = id_comments[idx:idx + batch_size]
             batch_json = {str(cid): text for cid, text in zip(batch_id, batch_text)}
             input_['comments'] = batch_json
             all_batches.append(input_)
-
 
         batch_response = []
         tasks = []
@@ -149,7 +171,7 @@ async def _analyze(
 
         if not batch_response:
             logger.error(f"Sau khi chạy tất cả batch, `batch_response` rỗng! all_batches: {all_batches}")
-            yield {'_type': 'error'}
+            yield {'_type': 'error', 'text': 'Internal server error'}
             return
 
         if len(batch_response) > 1:
@@ -165,13 +187,21 @@ async def _analyze(
 
     except Exception as e:
         logger.error(f"Lỗi khi xử lý phân tích comment: {e}")
-        yield {'_type': 'error'}
+        yield {'_type': 'error', 'text': 'Internal server error'}
         return
 
 async def crawl_comment(
     video_url: str,
 ):
-    video_id = _extract_video_id(video_url)
+    try:
+        video_id = _extract_video_id(video_url)
+    except ValueError as e:
+        logger.error(f"Invalid video URL: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
     downstream = "http://crawl-comment:5000/api/comments"
     params = {"video_id": video_id, "max_results": 1000}
 
@@ -196,10 +226,11 @@ async def crawl_comment(
 
     try:
         return resp.json()['comments']
-    except ValueError:
+    except (ValueError, KeyError) as e:
+        logger.error(f"Invalid response format from comments API: {e}")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Downstream comments API returned invalid JSON"
+            detail="Downstream comments API returned invalid response"
         )
 
 async def comment_analyze(
@@ -209,21 +240,35 @@ async def comment_analyze(
     initial_messages: List[ChatMessage],
     *args, **kwargs
 ):
-    xai_llm: XAILLM = get_xai_llm(
-        model_name=get_settings_cached().XAI_MODEL_NAME,
-    )
+    try:
+        xai_llm: XAILLM = get_xai_llm(
+            model_name=get_settings_cached().XAI_MODEL_NAME,
+        )
+    except Exception as e:
+        logger.error(f"Error initializing XAI model: {e}")
+        yield {'_type': 'error', 'text': 'Internal server error'}
+        return
 
-    agents = PPT.load_prompt(get_settings_cached().HGGPT_AGENT_PROMPT_PATH)
+    try:
+        agents = PPT.load_prompt(get_settings_cached().HGGPT_AGENT_PROMPT_PATH)
+        comment_id: dict = agents['CommentIQ']
+        comment_analyzer: dict = agents['comment_analyzer']
+        analysis_aggregator_expert: dict = agents['analysis_aggregator_expert']
+    except Exception as e:
+        logger.error(f"Error loading agent prompts: {e}")
+        yield {'_type': 'error', 'text': 'Internal server error'}
+        return
 
-    comment_id: dict = agents['CommentIQ']
-    comment_analyzer: dict = agents['comment_analyzer']
-    analysis_aggregator_expert: dict = agents['analysis_aggregator_expert']
-
-    messages = [
-        ChatMessage(role=MessageRole.SYSTEM, content="\n".join(comment_id.values()))
-    ] + initial_messages[1:] + [
-        ChatMessage(role=MessageRole.USER, content=query_text)
-    ]
+    try:
+        messages = [
+            ChatMessage(role=MessageRole.SYSTEM, content="\n".join(comment_id.values()))
+        ] + initial_messages[1:] + [
+            ChatMessage(role=MessageRole.USER, content=query_text)
+        ]
+    except Exception as e:
+        logger.error(f"Error creating messages: {e}")
+        yield {'_type': 'error', 'text': 'Internal server error'}
+        return
 
     async with TM.trace_span(
         span_name="CommentIQ",
@@ -236,24 +281,42 @@ async def comment_analyze(
         try:
             response: ChatCompletion = await wrapper(xai_llm.arun, messages=messages)
         except Exception as e:
-            yield {
-                '_type': 'error'
-            }
+            logger.error(f"Error calling XAI model: {e}")
+            yield {'_type': 'error', 'text': 'Internal server error'}
             return
 
-    json_resp = json_parser(response.choices[0].message.content)
-    if "status" in json_resp:
-        if json_resp['status'] == 'READY_FOR_ANALYSIS':
-            yield {'_type': 'response', 'text': f"{json_resp['response']}\n\n"}
+    try:
+        json_resp = json_parser(response.choices[0].message.content)
+    except Exception as e:
+        logger.error(f"Error parsing JSON response: {e}")
+        # Fallback to plain text response if JSON parsing fails
+        yield {'_type': 'response', 'text': response.choices[0].message.content}
+        return
 
-            async for data in _analyze(
-                user_id=user_id,
-                session_id=session_id,
-                video_url=json_resp['video_url'],
-                user_request=json_resp['user_request'],
-                comment_analyzer=comment_analyzer,
-                analysis_aggregator_expert=analysis_aggregator_expert,
-            ):
-                yield data
+    try:
+        if "status" in json_resp:
+            if json_resp['status'] == 'READY_FOR_ANALYSIS':
+                yield {'_type': 'response', 'text': f"{json_resp['response']}\n\n"}
+
+                async for data in _analyze(
+                    user_id=user_id,
+                    session_id=session_id,
+                    video_url=json_resp['video_url'],
+                    user_request=json_resp['user_request'],
+                    comment_analyzer=comment_analyzer,
+                    analysis_aggregator_expert=analysis_aggregator_expert,
+                ):
+                    yield data
+            else:
+                yield {'_type': 'response', 'text': response.choices[0].message.content}
         else:
+            # If no status field, return the raw response
             yield {'_type': 'response', 'text': response.choices[0].message.content}
+    except KeyError as e:
+        logger.error(f"Missing required field in JSON response: {e}")
+        yield {'_type': 'error', 'text': 'Internal server error'}
+        return
+    except Exception as e:
+        logger.error(f"Unexpected error processing response: {e}")
+        yield {'_type': 'error', 'text': 'Internal server error'}
+        return
