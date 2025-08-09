@@ -174,7 +174,7 @@ class HrBotManager(BaseManager):
                 fps,
             )
 
-        session_his = await self.gen_bot.memory_store.get_session_history(
+        session_his = await self.hr_bot.memory_store.get_session_history(
             session_id=session_id
         )
 

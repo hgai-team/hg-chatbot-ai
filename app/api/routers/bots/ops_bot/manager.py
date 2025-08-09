@@ -214,7 +214,7 @@ class OpsBotManager(BaseManager):
                 fps,
             )
 
-        session_his = await self.gen_bot.memory_store.get_session_history(
+        session_his = await self.ops_bot.memory_store.get_session_history(
             session_id=session_id
         )
 
