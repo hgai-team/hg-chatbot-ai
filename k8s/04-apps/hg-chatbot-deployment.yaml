@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hg-chatbot
+  namespace: hg-chatbot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hg-chatbot
+  template:
+    metadata:
+      labels:
+        app: hg-chatbot
+    spec:
+      # Chỉ chạy trên node GPU
+      nodeSelector:
+        accelerator: nvidia-gpu
+      containers:
+      - name: hg-chatbot
+        image: krntl/hgcb-k8s:latest
+        ports:
+        - containerPort: 8888
+        # Lấy biến môi trường từ ConfigMap và Secret
+        envFrom:
+        - configMapRef:
+            name: hg-chatbot-config      # :contentReference[oaicite:9]{index=9}
+        - secretRef:
+            name: hg-chatbot-secrets     # :contentReference[oaicite:10]{index=10}
+        # Mount thư mục model và upload từ PVC
+        volumeMounts:
+        - name: model-cache
+          mountPath: /app/model_cache
+          readOnly: true
+        - name: uploaded-files
+          mountPath: /app/uploaded_files
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "2Gi"
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+            nvidia.com/gpu: 1           # Yêu cầu 1 GPU
+      volumes:
+      - name: model-cache
+        persistentVolumeClaim:
+          claimName: model-weights-pvc  # :contentReference[oaicite:11]{index=11}
+      - name: uploaded-files
+        persistentVolumeClaim:
+          claimName: uploaded-files-pvc # :contentReference[oaicite:12]{index=12}
