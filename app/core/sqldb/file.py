@@ -64,5 +64,3 @@ class FileInfo(SQLModel, table=True):
             server_default=None,
         )
     )
-
-    demo: Optional[str] = Field(default=None)
