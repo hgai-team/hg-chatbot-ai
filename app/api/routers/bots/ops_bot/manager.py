@@ -45,8 +45,10 @@ from services.agentic_workflow.tools.prompt_processor import PromptProcessorTool
 from api.routers.bots.base import BaseManager
 from api.schema import (
     ChatRequest, UserContext,
-    AgentRequest, DocumentType
+    AgentRequest
 )
+
+from core.sqldb.file import DocumentType
 
 class OpsBotManager(BaseManager):
     def __init__(

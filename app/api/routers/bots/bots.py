@@ -21,13 +21,16 @@ from api.security.api_credentials import validate_auth
 from api.schema import (
     BaseResponse,
     ChatRequest, ChatResponse, UserContext,
-    FileResponse, DocumentType, UserInfo,
+    FileResponse,
     SessionResponse, SessionRatingResponse,
     AgentRequest, AgentResponse, AgentResult,
     LogResponse, LogResult
 )
 from api.config import get_bot_manager
 from api.routers.bots.base import BaseManager
+
+from core.sqldb.file import DocumentType
+from core.sqldb.user_info import UserInfo
 
 app = APIRouter(
     prefix="/bots",

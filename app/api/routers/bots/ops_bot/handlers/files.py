@@ -34,7 +34,8 @@ from api.routers.bots.tools.files import (
     delete_file
 )
 
-from api.schema import DocumentType, FileInfo, UserInfo
+from core.sqldb.file import DocumentType, FileInfo
+from core.sqldb.user_info import UserInfo
 
 from services.agentic_workflow.bots.ops_bot import OpsBotService
 

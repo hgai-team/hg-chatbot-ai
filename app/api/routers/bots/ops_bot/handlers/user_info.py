@@ -8,7 +8,7 @@ from sqlmodel import (
 
 from sqlalchemy.dialects.postgresql import insert
 
-from api.schema import (
+from core.sqldb.user_info import (
     UserInfo,
 )
 from core.storages.client import PostgresEngineManager as PEM

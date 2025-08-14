@@ -5,8 +5,7 @@ import asyncio
 
 from typing import List, Optional, Dict, Any
 
-from .base import SpanCreate, TraceSpan
-
+from core.sqldb.traces import SpanCreate, TraceSpan
 
 from core.storages.client import (
     PostgresEngineManager as PEM,

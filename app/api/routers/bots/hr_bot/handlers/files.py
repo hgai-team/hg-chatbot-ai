@@ -25,7 +25,7 @@ from api.routers.bots.tools.files import (
     delete_file
 )
 
-from api.schema import DocumentType, FileInfo
+from core.sqldb.file import DocumentType, FileInfo
 
 from services.agentic_workflow.bots.hr_bot import HrBotService
 

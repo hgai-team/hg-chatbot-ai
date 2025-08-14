@@ -12,7 +12,7 @@ from sqlmodel import (
 
 from fastapi import HTTPException, status
 
-from api.schema import (
+from core.sqldb.file import (
     FileInfo, DocumentType
 )
 

@@ -8,9 +8,7 @@ from fastapi import (
 
 from api.security import validate_auth
 
-from api.schema import (
-    DocumentType
-)
+from core.sqldb.file import DocumentType
 
 from api.routers.bots.tools.files import get_files_info
 
@@ -45,7 +43,7 @@ async def get_files_metadata(
             sort_order=sort_order
         )
         return resp
-    
+
     except HTTPException:
         raise
     except Exception as e:

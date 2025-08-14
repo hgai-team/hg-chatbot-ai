@@ -12,7 +12,7 @@ from sqlalchemy import cast
 from sqlalchemy.dialects.postgresql import JSONB
 
 from core.storages.client import PostgresEngineManager as PEM
-from core.storages.tracestores import TraceSpan
+from core.sqldb.traces import TraceSpan
 
 
 async def get_all_traces(

@@ -9,9 +9,10 @@ from api.routers import (
 )
 
 from api.security import validate_auth
-from api.schema import UserInfo, FileInfo
 from core.storages.client import PostgresEngineManager
-from core.storages.tracestores import TraceSpan, SpanCreate
+from core.sqldb.traces import TraceSpan, SpanCreate
+from core.sqldb.file import FileInfo
+from core.sqldb.user_info import UserInfo
 
 async def create_db_and_tables():
     async_engine = PostgresEngineManager.init_engine()

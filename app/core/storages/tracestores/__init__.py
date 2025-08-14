@@ -1,8 +1,8 @@
-from .base import TraceSpan, SpanCreate
 from .postgres import PostgresTraceStore
+# from .schema import SpanCreate, TraceSpan
 
 __all__ = [
-    "TraceSpan",
-    "SpanCreate",
+    # "TraceSpan",
+    # "SpanCreate",
     "PostgresTraceStore"
 ]

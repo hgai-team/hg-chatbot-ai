@@ -3,12 +3,7 @@ from .chat import ChatRequest, ChatResponse, UserContext
 from .base import BaseResponse
 
 from .file import (
-    FileResponse,
-    FileInfo, DocumentType
-)
-
-from .user_info import (
-    UserInfo,
+    FileResponse
 )
 
 from .sessions import SessionResponse, SessionResult, SessionRatingResponse, SessionRatingResult
@@ -25,10 +20,6 @@ __all__ = [
     'BaseResponse',
 
     'FileResponse',
-    'FileInfo',
-    'DocumentType',
-
-    'UserInfo',
 
     'SessionResponse',
     'SessionResult',

@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse
 from openai.types.chat.chat_completion import ChatCompletion
 from llama_index.core.llms import ChatResponse
 
-from api.schema import DocumentType
+from core.sqldb.file import DocumentType
 
 from core.loaders import (
     ExcelReader,

@@ -13,9 +13,10 @@ from services import get_settings_cached
 from services.agentic_workflow.bots.hr_bot import HrBotService
 from api.routers.bots.base import BaseManager
 from api.schema import (
-    ChatRequest,
-    DocumentType
+    ChatRequest
 )
+
+from core.sqldb.file import DocumentType
 
 from .handlers.chat import (
     hr_chat_stop,
