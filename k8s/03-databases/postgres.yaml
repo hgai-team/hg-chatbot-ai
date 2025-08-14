@@ -31,6 +31,10 @@ spec:
       labels:
         app: postgres
     spec:
+      volumes:
+      - name: postgres-data
+        persistentVolumeClaim:
+          claimName: postgres-data-pvc
       containers:
       - name: postgres
         image: postgres:15
@@ -60,11 +64,11 @@ spec:
           mountPath: /var/lib/postgresql/data
         resources:
           requests:
-            memory: "256Mi"
-            cpu: "250m"
+            memory: "2Gi"
+            cpu: "2"
           limits:
-            memory: "1Gi"
-            cpu: "1"
+            memory: "4Gi"
+            cpu: "4"
         livenessProbe:
           exec:
             command:
@@ -73,12 +77,3 @@ spec:
             - $(POSTGRES_USER)
           initialDelaySeconds: 30
           periodSeconds: 10
-  volumeClaimTemplates:
-  - metadata:
-      name: postgres-data
-    spec:
-      accessModes: [ "ReadWriteOnce" ]
-      storageClassName: "local-storage"
-      resources:
-        requests:
-          storage: 30Gi

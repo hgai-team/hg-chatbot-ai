@@ -4,26 +4,82 @@ kind: PersistentVolumeClaim
 metadata:
   name: uploaded-files-pvc
   namespace: hg-chatbot
+  labels:
+    app: uploaded-files
 spec:
   accessModes:
     - ReadWriteMany
   storageClassName: nfs-storage
   resources:
     requests:
-      storage: 100Gi
+      storage: 20Gi
   volumeName: nfs-uploaded-files-pv
 
+---
 # PVC cho model weights
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: model-weights-pvc
   namespace: hg-chatbot
+  labels:
+    app: model-weights
 spec:
   accessModes:
     - ReadOnlyMany
   storageClassName: nfs-storage
   resources:
     requests:
-      storage: 50Gi
+      storage: 100Gi
   volumeName: nfs-model-weights-pv
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-data-pvc
+  namespace: hg-chatbot
+  labels:
+    app: mongodb
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-storage
+  resources:
+    requests:
+      storage: 20Gi
+  volumeName: nfs-db-mongodb-pv
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data-pvc
+  namespace: hg-chatbot
+  labels:
+    app: postgres
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-storage
+  resources:
+    requests:
+      storage: 30Gi
+  volumeName: nfs-db-postgres-pv
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: qdrant-data-pvc
+  namespace: hg-chatbot
+  labels:
+    app: qdrant
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-storage
+  resources:
+    requests:
+      storage: 10Gi
+  volumeName: nfs-db-qdrant-pv

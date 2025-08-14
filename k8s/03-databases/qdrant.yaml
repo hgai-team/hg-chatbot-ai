@@ -17,6 +17,7 @@ spec:
   selector:
     app: qdrant
 
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -33,6 +34,10 @@ spec:
       labels:
         app: qdrant
     spec:
+      volumes:
+      - name: qdrant-data
+        persistentVolumeClaim:
+          claimName: qdrant-data-pvc
       containers:
       - name: qdrant
         image: qdrant/qdrant:v1.14.1
@@ -57,12 +62,3 @@ spec:
             port: 6333
           initialDelaySeconds: 5
           periodSeconds: 5
-  volumeClaimTemplates:
-  - metadata:
-      name: qdrant-data
-    spec:
-      accessModes: [ "ReadWriteOnce" ]
-      storageClassName: "local-storage"
-      resources:
-        requests:
-          storage: 10Gi

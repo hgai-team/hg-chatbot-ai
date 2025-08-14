@@ -4,7 +4,7 @@ metadata:
   name: nfs-uploaded-files-pv
 spec:
   capacity:
-    storage: 100Gi
+    storage: 20Gi
   accessModes:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Retain
@@ -12,16 +12,15 @@ spec:
   nfs:
     server: 192.168.1.74
     path: /srv/k8s-shared/uploaded-files
-    readOnly: falses
-
-
+    readOnly: false
+---
 apiVersion: v1
 kind: PersistentVolume
 metadata:
   name: nfs-model-weights-pv
 spec:
   capacity:
-    storage: 50Gi
+    storage: 100Gi
   accessModes:
     - ReadOnlyMany
   persistentVolumeReclaimPolicy: Retain

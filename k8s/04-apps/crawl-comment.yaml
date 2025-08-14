@@ -1,3 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: crawl-comment-service
+  namespace: hg-chatbot
+  labels:
+    app: crawl-comment
+spec:
+  selector:
+    app: crawl-comment
+  ports:
+  - port: 80
+    targetPort: 5000
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -24,15 +38,4 @@ spec:
             memory: "512Mi"
             cpu: "500m"
 
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: crawl-comment-service
-  namespace: hg-chatbot
-spec:
-  selector:
-    app: crawl-comment
-  ports:
-  - port: 80
-    targetPort: 5000
+
