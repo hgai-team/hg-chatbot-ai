@@ -5,32 +5,40 @@ metadata:
   namespace: hg-chatbot
 data:
   # App configurations
-  APP_NAME: "HG Chatbot"
-  APP_ENV: "production"
-  APP_PORT: "8888"
-  
-  # Model configurations
-  MODEL_NAME: "vinai/phobert-base"
-  MODEL_CACHE_DIR: "/app/model_cache"
-  
-  # Upload configurations
-  UPLOAD_DIR: "/app/uploaded_files"
-  MAX_UPLOAD_SIZE: "104857600"  # 100MB
-  ALLOWED_EXTENSIONS: "pdf,txt,docx,csv"
-  
-  # Database endpoints (internal K8s DNS)
-  MONGODB_HOST: "mongodb-hg-chatbot"
-  MONGODB_PORT: "27017"
-  MONGODB_DB: "hg_chatbot"
-  
-  POSTGRES_HOST: "postgres-hg-chatbot"
-  POSTGRES_PORT: "5432"
-  POSTGRES_DB: "hg_chatbot"
-  
+  ENV: "dev"
+  VALIDATE_API: "False"
+
+  OPENAI_CHAT_MODEL: "o4-mini"
+  OPENAI_CODE_MODEL: "gpt-4.1-mini"
+  OPENAI_TEXT_EMBEDDING_MODEL: "text-embedding-3-large"
+
+  GOOGLEAI_MODEL: "models/gemini-2.5-flash-lite-preview-06-17"
+  GOOGLEAI_MODEL_THINKING: "models/gemini-2.5-flash-preview-05-20"
+  GOOGLEAI_MODEL_EDITOR: "models/gemini-2.5-flash-preview-04-17-thinking"
+
+  XAI_MODEL_NAME: "grok-3-mini"
+
+  QDRANT_BASE_COLLECTION_NAME: "_collection"
+  QDRANT_URL: "http://qdrant-hg-chatbot:6333"
   QDRANT_HOST: "qdrant-hg-chatbot"
   QDRANT_PORT: "6333"
-  QDRANT_COLLECTION: "documents"
-  
-  # Logging
-  LOG_LEVEL: "INFO"
-  LOG_DIR: "/app/logs"
+
+  MONGODB_BASE_DATABASE_NAME: "_database"
+  MONGODB_BASE_CHAT_HISTORY_COLLECTION_NAME: "_chat_history"
+  MONGODB_BASE_DOC_COLLECTION_NAME: "_docs"
+
+  OPS_AGENT_PROMPT_PATH: "core/config/agents/ops_agent.yaml"
+  OPS_AGENT_THINKING_PROMPT_PATH: "core/config/agents/ops_agent_thinking.json"
+
+  HR_AGENT_PROMPT_PATH: "core/config/agents/hr_agent.yaml"
+  HGGPT_AGENT_PROMPT_PATH: "core/config/agents/hggpt_agent.yaml"
+  VIDMIND_AGENT_PROMPT_PATH: "core/config/agents/vidmind_agent.yaml"
+
+  SQL_DB_PATH: "sqlite:///./data/vahacha.db"
+
+  BASE_PROMPT_PATH: "core/config/base.yaml"
+  BASE_QUERY: "Bạn có thể giúp gì cho tôi?"
+
+  POSTGRES_HOST: "postgres-hg-chatbot"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "hgcbdb"
