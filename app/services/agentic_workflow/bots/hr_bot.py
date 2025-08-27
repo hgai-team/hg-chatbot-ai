@@ -271,7 +271,7 @@ class HrBotService(BaseBotService):
         docs = await self._get_parents_and_merge(retrieved_docs, all_docs)
 
         reranked_res = await MSMarcoReranker.rerank(query_text, docs)
-        reranked_docs = [res[0] for res in reranked_res]
+        reranked_docs = [res["doc"] for res in reranked_res]
 
         documents_as_markdown = []
         for i, doc in enumerate(reranked_docs, 1):
@@ -382,7 +382,7 @@ class HrBotService(BaseBotService):
             docs = await self._get_parents_and_merge(retrieved_docs, all_docs)
 
             reranked_res = await MSMarcoReranker.rerank(query_text, docs)
-            reranked_docs = [res[0] for res in reranked_res]
+            reranked_docs = [res["doc"] for res in reranked_res]
 
             documents_as_markdown = []
             for i, doc in enumerate(reranked_docs, 1):

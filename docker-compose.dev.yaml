@@ -33,10 +33,35 @@ services:
     command: uvicorn main:app --host 0.0.0.0 --port 28888 --reload
 
     depends_on:
+      - msmarco-hg-chatbot
       - mongodb-hg-chatbot
       - qdrant-hg-chatbot
       - postgres-hg-chatbot
       - crawl-comment
+
+  msmarco-hg-chatbot:
+    image: krntl/rerank:latest
+    container_name: dev-msmarco-hg-chatbot
+
+    restart: unless-stopped
+
+    ports:
+      - 28889:28889
+    volumes:
+      - "./rerank_services:/app"
+      - "./model_weights:/root/.cache/huggingface/hub"
+    networks:
+      - hg-chatbot-network
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    command: uvicorn main:app --host 0.0.0.0 --port 28889 --reload
 
   mongodb-hg-chatbot:
     image: mongodb/mongodb-community-server:7.0.11-ubuntu2204

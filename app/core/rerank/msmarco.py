@@ -1,83 +1,53 @@
 import logging
+from datetime import datetime
+import httpx
+
 logger = logging.getLogger(__name__)
 
-import asyncio
-import torch, gc
-
-from typing import List, Tuple, Optional
-from sentence_transformers import CrossEncoder
-
 from .base import BaseReranker
+from api.config import get_api_settings
+
+def serialize_datetime_objects(obj):
+    """Recursively convert datetime objects to ISO format strings"""
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    elif isinstance(obj, dict):
+        return {key: serialize_datetime_objects(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [serialize_datetime_objects(item) for item in obj]
+    else:
+        return obj
 
 class MSMarcoReranker(BaseReranker):
-    _model_name: str = 'cross-encoder/ms-marco-MiniLM-L6-v2'
-    _model: Optional[CrossEncoder] = None
-
-    _predict_lock = asyncio.Semaphore(1)
-
-    @classmethod
-    def _cleanup_model(cls):
-        if cls._model is not None:
-            cls._model.to('cpu')
-            del cls._model
-            cls._model = None
-            torch.cuda.empty_cache()
-            gc.collect()
+    base_url = "http://msmarco-hg-chatbot:28889" if get_api_settings().ENV == "dev" else "http://msmarco-hg-chatbot:18889"
     
     @classmethod
-    async def rerank(
-        cls,
-        query: str,
-        docs: List[dict],
-        model_name: Optional[str] = None
-    ) -> List[Tuple[str, float]]:
-
-        if not torch.cuda.is_available():
-            raise RuntimeError("CUDA GPU is required but not available")
-
-        name = model_name or cls._model_name
+    async def health_check(cls):
+        """Check service health"""
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{cls.base_url}/health")
+            return response.json()
+    
+    @classmethod
+    async def rerank(cls, query: str, docs: list, model_name: str = None):
+        """Rerank documents"""
+        # Serialize datetime objects in docs
+        serialized_docs = serialize_datetime_objects(docs)
         
-        if torch.cuda.memory_allocated() > torch.cuda.max_memory_allocated() * 0.8:
-            cls._cleanup_model()
-
-        if cls._model is None or (model_name and name != cls._model_name):
-            if cls._model is not None:
-                try:
-                    cls._model.to('cpu')
-                except Exception:
-                    pass
-                del cls._model
-                torch.cuda.empty_cache()
-                gc.collect()
-
-            logger.info(f"Init rerank model: {name}")
-            cls._model = CrossEncoder(name, device='cuda')
-            cls._model.eval()
-            cls._model_name = name
-
-        passages = []
-        for idx in range(len(docs)):
-            doc: dict = docs[idx]
-            passages.append(doc["text"])
-            if 'original_content' in doc['metadata']:
-                doc["text"] = doc['metadata']['original_content']
-            doc.pop('metadata')
-
-        inputs = [[query, passage] for passage in passages]
-
-        async with cls._predict_lock:
-            def _predict():
-                with torch.no_grad():
-                    return cls._model.predict(inputs)
-            raw_scores = await asyncio.to_thread(_predict)
-
-        scores: List[float] = [float(s) for s in raw_scores]
-
-        ranked: List[Tuple[str, float]] = sorted(
-            zip(docs, scores),
-            key=lambda x: x[1],
-            reverse=True
-        )
-
-        return ranked
-
+        payload = {
+            "query": query,
+            "docs": serialized_docs,
+            "model_name": model_name
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{cls.base_url}/rerank",
+                json=payload,
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if response.status_code == 200:
+                return response.json()["results"]
+            else:
+                raise Exception(f"Request failed: {response.status_code} - {response.text}")

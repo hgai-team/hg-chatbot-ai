@@ -281,7 +281,7 @@ class OpsBotService(BaseBotService):
             ]
 
             reranked_res = await MSMarcoReranker.rerank(query_text, docs)
-            reranked_docs = [res[0] for res in reranked_res]
+            reranked_docs = [res["doc"] for res in reranked_res]
 
             documents_as_markdown = []
             for i, doc in enumerate(reranked_docs, 1):
@@ -404,7 +404,7 @@ class OpsBotService(BaseBotService):
                 raise HTTPException(status_code=500, detail="Error during context retrieval")
 
             ids = list(retrieved_context.source_documents.keys())
-
+            
             if ids:
                 retrieved_docs = await self.file_processor.mongodb_doc_store.get(ids)
                 docs = [
@@ -417,13 +417,13 @@ class OpsBotService(BaseBotService):
                 ]
 
                 reranked_res = await MSMarcoReranker.rerank(query_text, docs)
-                reranked_docs = [res[0] for res in reranked_res]
+                reranked_docs = [res["doc"] for res in reranked_res]
 
                 documents_as_markdown = []
                 for i, doc in enumerate(reranked_docs, 1):
                     doc_str = f"### Tài liệu {i}\n\n{doc['text']}"
                     documents_as_markdown.append(doc_str)
-
+                
                 retrieved_context.context_string = "\n\n---\n\n".join(documents_as_markdown)
 
             yield {'_type': 'thinking', 'text': 'Hoàn thành tìm kiếm thông tin!\n'}
