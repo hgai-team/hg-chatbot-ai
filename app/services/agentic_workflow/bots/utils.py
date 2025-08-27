@@ -99,11 +99,9 @@ async def init_base_chat(
     user_id: str,
     session_id: str,
     memory_store: MongoDBMemoryStore,
-    llm: Any,
     bot_name: str
 ):
     chat_id = str(uuid4())
-    session_title = "New Chat"
 
     chat_to_store = BaseChat(
         message=query_text,
@@ -111,18 +109,16 @@ async def init_base_chat(
     )
 
     try:
-        session_title = await memory_store.add_chat(
+        is_new_session = await memory_store.add_chat(
             user_id=user_id,
             session_id=session_id,
-            chat=chat_to_store,
-            llm=llm,
-            bot_name=bot_name
+            chat=chat_to_store
         )
     except Exception as e:
         logger.error(f"{bot_name} - Failed to store chat history in init_base_chat for session '{session_id}': {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error during init_base_chat")
 
-    return chat_id, session_title
+    return chat_id, is_new_session
 
 async def update_chat(
     chat_id: str,

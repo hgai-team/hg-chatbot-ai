@@ -135,12 +135,11 @@ class HrBotService(BaseBotService):
         try:
             # Initialize base chat
             try:
-                chat_id, session_title = await init_base_chat(
+                chat_id, is_new_session = await init_base_chat(
                     query_text=query_text, 
                     user_id=user_id, 
-                    session_id=session_id,
+                    session_id=session_id,  
                     memory_store=self.memory_store, 
-                    llm=self.google_llm, 
                     bot_name=self.bot_name
                 )
             except Exception as e:
@@ -262,12 +261,11 @@ class HrBotService(BaseBotService):
         try:
             # Initialize base chat
             try:
-                chat_id, session_title = await init_base_chat(
+                chat_id, is_new_session = await init_base_chat(
                     query_text=query_text, 
                     user_id=user_id, 
-                    session_id=session_id,
+                    session_id=session_id,  
                     memory_store=self.memory_store, 
-                    llm=self.google_llm, 
                     bot_name=self.bot_name
                 )
             except Exception as e:
@@ -276,8 +274,6 @@ class HrBotService(BaseBotService):
                 return
 
             try:
-                if session_title:
-                    yield {'_type': 'session_title', 'text': session_title}
                 yield {'_type': 'chat_id', 'text': chat_id}
 
                 yield {'_type': 'header_thinking', 'text': 'Đang phân tích yêu cầu...\n'}
@@ -388,6 +384,12 @@ class HrBotService(BaseBotService):
                     user_id=user_id,
                     agent_name=self.bot_name
                 )
+                if is_new_session:
+                    session_title = await self.memory_store.create_session_title(
+                        user_id=user_id, session_id=session_id,
+                        bot_name=self.bot_name, llm=self.google_llm, message=query_text, response=response_text
+                    )
+                    yield {'_type': 'session_title', 'text': session_title}
 
                 yield {'_type': 'response', 'text': response_text}
             except Exception as e:

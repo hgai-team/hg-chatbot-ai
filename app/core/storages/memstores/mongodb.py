@@ -54,29 +54,34 @@ class MongoDBMemoryStore(BaseMemoryStore):
         await self.collection.create_index("user_id")
         await self.collection.create_index("session_id")
         
-    async def _create_session_title(
+    async def create_session_title(
         self,
         user_id: str,
         session_id: str,
         bot_name: str,
         llm: GoogleGenAILLM,
-        message: str
+        message: str,
+        response: str
     ):
         from services.agentic_workflow.tools.prompt_processor import PromptProcessorTool as PPT
         
         messages=PPT.prepare_chat_messages(
             system_prompt=(
                 "Chat Thread Title Expert: Bạn là chuyên gia chuyên tạo tiêu đề cho luồng chat. "
-                "Nhiệm vụ của bạn là dựa vào câu hỏi gốc để sinh ra một tiêu đề ngắn gọn, súc tích, phản ánh đúng chủ đề của luồng.\n"
+                "Nhiệm vụ của bạn là dựa vào câu hỏi và câu trả lời để sinh ra một tiêu đề ngắn gọn, súc tích, phản ánh đúng chủ đề của luồng.\n"
                 "1. Nhận tham số:\n"
                 "    - question: nội dung câu hỏi gốc.\n"
-                "2. Phân tích và tổng hợp thông tin để tạo tiêu đề ngắn gọn, dễ hiểu và hấp dẫn, khái quát nội dung luồng chat.\n"
+                "    - answer: nội dung câu trả lời.\n"
+                "2. Phân tích và tổng hợp thông tin để tạo tiêu đề ngắn gọn, dễ hiểu, hấp dẫn và sáng tạo, khái quát nội dung luồng chat.\n"
                 "3. Đầu ra phải là một đoạn text ngắn gọn dài từ 15 đến 30 ký tự."
             ),
             prompt=f"""
                 #Input:
                     question:
                     {message}
+                    
+                    answer:
+                    {response}
                 #Output:
             """
         )
@@ -89,9 +94,16 @@ class MongoDBMemoryStore(BaseMemoryStore):
                 "session_id": session_id,
             }
         ) as (_, _, wrapper):
-            response: ChatResponse = await wrapper(llm.arun, messages=messages)
+            response_title: ChatResponse = await wrapper(llm.arun, messages=messages)
         
-        return response.message.content
+        session_title = response_title.message.content
+        
+        await self.collection.update_one(
+            {"session_id": session_id},
+            {"$set": {"session_title": session_title}}
+        )
+        
+        return session_title
 
     async def add_metadata(
         self,
@@ -163,13 +175,8 @@ class MongoDBMemoryStore(BaseMemoryStore):
                     "$set": {"last_updated": current_time}
                 }
             )
-            return None
+            return False
         else:
-            session_title = await self._create_session_title(
-                user_id=user_id, session_id=session_id, bot_name=kwargs['bot_name'],
-                llm=kwargs['llm'], message=chat.message
-            )
-
             new_chat_history = {
                 "session_id": session_id,
                 "user_id": user_id,
@@ -188,10 +195,10 @@ class MongoDBMemoryStore(BaseMemoryStore):
                 ],
                 "created_at": current_time,
                 "last_updated": current_time,
-                "session_title": session_title
+                "session_title": "New Chat"
             }
             await self.collection.insert_one(new_chat_history)
-            return new_chat_history["session_title"]
+            return True
 
     async def update_chat(
         self,
